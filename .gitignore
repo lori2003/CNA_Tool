@@ -1,0 +1,21 @@
+# Ambiente virtuale Python
+.venv/
+venv/
+env/
+
+# Cache Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Log
+*.log
+
+# File temporanei / immagini di lavoro
+image copy.png
+
+# Configurazione locale Claude
+.claude/
+
+# Agent config locale
+.agent/

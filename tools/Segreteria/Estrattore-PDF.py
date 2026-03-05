@@ -39,13 +39,11 @@ TOOL = {
         "File PDF ottimizzati archiviati nelle cartelle fornitore su Disco F:."
     ),
     'inputs': [
-        {'key': '_sec_tunnel',   'label': '### 🔄 Sincronizzazione Cloudflare Tunnel', 'type': 'markdown'},
-        {'key': '_sec_upload',   'label': '### 📤 Caricamento Manuale dal PC',         'type': 'markdown'},
-        {'key': 'files_manuali', 'label': 'Carica file (PDF, JPG, PNG, WEBP)',         'type': 'file_multi'},
-        {'key': '_sec_dash',     'label': '### 📂 Dashboard Gestionale',               'type': 'markdown'},
+        {'key': 'files_manuali', 'label': '📤 Carica file dal PC (PDF, JPG, PNG, WEBP)', 'type': 'file_multi'},
     ],
     'params': [
-        # ── Tunnel ─────────────────────────────────────────────────────────
+        # ── Sezione: Tunnel ─────────────────────────────────────────────────
+        {'key': '_sec_tunnel',   'label': '### 🔄 Sincronizzazione Cloudflare Tunnel', 'type': 'markdown'},
         {'key': 'tunnel_status', 'label': 'Stato tunnel corrente',
          'type': 'dynamic_info', 'function': 'get_tunnel_status'},
         {'key': 'avvia_tunnel',  'label': '▶ Avvia Sync (Cloudflare)',
@@ -54,26 +52,15 @@ TOOL = {
          'type': 'checkbox', 'default': False},
         {'key': 'kill_zombie',   'label': '🔥 Kill Zombie (termina cloudflared orfani)',
          'type': 'checkbox', 'default': False},
-        # ── Dashboard ───────────────────────────────────────────────────────
-        {'key': 'dashboard_files', 'label': 'File in attesa di elaborazione',
+        # ── Sezione: Dashboard ──────────────────────────────────────────────
+        {'key': '_sec_dash',      'label': '### 📂 Dashboard Gestionale', 'type': 'markdown'},
+        {'key': 'dashboard_files','label': 'File in attesa di elaborazione',
          'type': 'dynamic_info', 'function': 'get_dashboard_info'},
         {'key': 'archivia_tutti', 'label': '📦 Archivia tutti i file dalla coda',
          'type': 'checkbox', 'default': False},
-        # ── Configurazione ──────────────────────────────────────────────────
-        {'key': 'output_path', 'label': '📁 Cartella Destinazione Archivio',
+        {'key': 'output_path',    'label': '📁 Cartella Destinazione Archivio',
          'type': 'text', 'default': r'F:\Cna Pensionati\CNA PENSIONATI 2026\Fatture',
          'placeholder': r'Es: F:\CNA\Fatture'},
-        # ── Elaborazione immagini ───────────────────────────────────────────
-        {'key': 'auto_crop',        'label': '🔲 Auto-Crop (rilevamento bordi documento)',
-         'type': 'checkbox', 'default': True},
-        {'key': 'white_background', 'label': '⬜ Sfondo Bianco',
-         'type': 'checkbox', 'default': True},
-        {'key': 'brightness',       'label': '☀️ Luminosità (-50 / +50)',
-         'type': 'number',   'default': 35},
-        {'key': 'contrast',         'label': '🌗 Contrasto (0.5 – 2.0)',
-         'type': 'number',   'default': 1.4},
-        {'key': 'clahe_strength',   'label': '📊 CLAHE – contrasto locale (0 = disabilitato)',
-         'type': 'number',   'default': 0.0},
     ],
 }
 
@@ -550,6 +537,7 @@ def find_cloudflared() -> str:
 
 def get_tunnel_status(params: dict) -> str:
     """Mostra lo stato attuale del tunnel Cloudflare."""
+    from core.toolkit import ctx
     global _tunnel_proc
     is_running = _tunnel_proc is not None and _tunnel_proc.poll() is None
 
@@ -578,6 +566,7 @@ def get_tunnel_status(params: dict) -> str:
 
 def get_dashboard_info(params: dict) -> str:
     """Mostra i file in attesa di elaborazione nella coda SYNC_BRIDGE."""
+    from core.toolkit import ctx
     files = sorted([
         f for f in SYNC_BRIDGE.glob("*")
         if f.suffix.lower() in VALID_EXTS and not f.name.startswith("_preview_")
@@ -585,7 +574,7 @@ def get_dashboard_info(params: dict) -> str:
     if not files:
         ctx.info("📭 Nessun file in coda.")
         return ""
-    lines = [f"📁 **{len(files)} file in coda** (pronto per archivazione):"]
+    lines = [f"📁 **{len(files)} file in coda** (pronti per archiviazione):"]
     for f in files:
         try:
             size_kb = f.stat().st_size // 1024
@@ -908,13 +897,14 @@ def run(
     kill_zombie=False,
     archivia_tutti=False,
     files_manuali=None,
-    auto_crop=True,
-    white_background=True,
-    brightness=35,
-    contrast=1.4,
-    clahe_strength=0.0,
     **kwargs,
 ):
+    # Impostazioni OpenCV: valori default ottimali, non esposti nella form
+    auto_crop = True
+    white_background = True
+    brightness = 35
+    contrast = 1.4
+    clahe_strength = 0.0
     """Gestisce tunnel, upload manuale e archiviazione file."""
     global _tunnel_proc
     output_files = []

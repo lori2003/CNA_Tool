@@ -23,6 +23,7 @@ SUPPORTED_INPUT_TYPES = {
 SUPPORTED_PARAM_TYPES = {
     "select", "radio", "checkbox", "number", "text",
     "textarea", "multiselect", "dynamic_info", "folder", "file_path_info",
+    "markdown", "info", "warning", "error", "success",
 }
 
 

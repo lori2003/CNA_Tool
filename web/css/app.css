@@ -707,6 +707,23 @@ textarea.fi { resize: vertical; min-height: 80px; }
 .radio-p:hover { border-color: var(--green); color: var(--green); }
 .radio-p.on    { background: var(--green); border-color: var(--green); color: #fff; font-weight: 600; }
 
+/* Action Button */
+.action-btn {
+  width: 100%; padding: 10px 16px; border: none; border-radius: var(--r8);
+  background: var(--green); color: #fff; font-size: 13.5px; font-weight: 600;
+  cursor: pointer; transition: opacity var(--ease), transform var(--ease);
+  font-family: var(--font);
+}
+.action-btn:hover:not(:disabled) { opacity: .88; }
+.action-btn:active:not(:disabled) { transform: scale(.98); }
+.action-btn:disabled { opacity: .5; cursor: not-allowed; }
+.action-btn.action-btn-danger { background: var(--red); }
+.action-btn.action-btn-secondary {
+  background: transparent; color: var(--t-body);
+  border: 1.5px solid var(--border);
+}
+.action-result { margin-top: 6px; }
+
 /* Checkbox */
 .chk-row { display: flex; align-items: center; gap: 10px; cursor: pointer; }
 .chk-box {

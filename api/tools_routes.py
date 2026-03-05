@@ -164,7 +164,7 @@ async def run_tool_endpoint(uid: str, request: Request):
         elif field_name in tool_params_keys:
             p_meta = tool_params_map.get(field_name, {})
             p_type = p_meta.get("type", "text")
-            if p_type == "checkbox":
+            if p_type in ("checkbox", "action_button"):
                 params[field_name] = value in ("true", "1", "on", True)
             elif p_type == "number":
                 try:

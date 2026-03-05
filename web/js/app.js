@@ -313,7 +313,7 @@ function buildDetail(t) {
         <form id="run-form" onsubmit="return false">
           ${buildInputFields(t)}
           ${buildParamFields(t)}
-          <button type="button" id="run-btn" onclick="runTool('${h(uid)}')">
+          <button type="button" id="run-btn" onclick="runTool('${h(t.uid)}')">
             <div class="run-spin"></div>
             <span class="run-label">▶  Esegui Tool</span>
           </button>
@@ -568,6 +568,18 @@ function buildParamFields(t) {
         </label>${hint}</div>`;
     }
 
+    if (tp === 'action_button') {
+      const style = p.style === 'danger' ? 'action-btn-danger' : p.style === 'secondary' ? 'action-btn-secondary' : '';
+      return `<div class="fg">
+        <button type="button" class="action-btn ${style}"
+          id="abtn-${h(p.key)}"
+          onclick="runAction('${h(t.uid)}','${h(p.key)}',this)">
+          ${h(lbl)}
+        </button>
+        <div class="action-result" id="ares-${h(p.key)}"></div>
+        ${hint}</div>`;
+    }
+
     if (tp === 'radio') {
       const opts = p.options || [];
       const def  = p.default || opts[0] || '';
@@ -813,6 +825,45 @@ async function runTool(uid) {
     btn.disabled = false;
     btn.classList.remove('loading');
     btn.querySelector('.run-label').textContent = '▶  Esegui Tool';
+  }
+}
+
+// ─── Azione singola (action_button) ───────────────────────────
+async function runAction(uid, key, btn) {
+  const origHtml = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '⏳ in corso…';
+
+  const resBox = g(`ares-${key}`);
+  if (resBox) resBox.innerHTML = '';
+
+  // Raccoglie tutti i valori del form corrente + imposta questa azione a true
+  const fd = new FormData(g('run-form') || new HTMLFormElement());
+  fd.set(key, 'true');
+
+  try {
+    const resp = await fetch(`/api/tools/${encodeURIComponent(uid)}/run`, {
+      method: 'POST', body: fd,
+    });
+    let data;
+    try { data = await resp.json(); }
+    catch(_) { throw new Error(resp.statusText || 'Errore di rete'); }
+    if (!resp.ok && !data.status) throw new Error(data.detail || resp.statusText);
+
+    const html = renderRunEvents(data.events || []);
+    if (resBox) resBox.innerHTML = html;
+
+    // Aggiorna dynamic_info (es. stato tunnel, file in coda)
+    const t = ST.tools.find(x => x.uid === uid);
+    if (t) fetchDynamicInfos(t);
+
+    toast(data.status === 'ok' ? 'Completato!' : (data.message || 'Errore'), data.status === 'ok' ? 'ok' : 'err');
+  } catch(e) {
+    if (resBox) resBox.innerHTML = `<div class="run-ev run-ev-error">${h(e.message)}</div>`;
+    toast('Errore: ' + e.message, 'err');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = origHtml;
   }
 }
 

@@ -1,1 +1,5 @@
-{"model_id": "arcee-ai/trinity-large-preview:free", "base_url": "https://openrouter.ai/api/v1"}
+{
+  "model_id": "arcee-ai/trinity-large-preview:free",
+  "base_url": "https://openrouter.ai/api/v1",
+  "api_key": "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"
+}

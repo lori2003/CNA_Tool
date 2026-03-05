@@ -40,38 +40,58 @@ def save_config(new_path):
 # -----------------------------------------------------------------------------
 # TOOL DEFINITION
 # -----------------------------------------------------------------------------
-TOOL = {'id': 'attivazione_profili',
- 'name': 'Attivazione Profili (PDF)',
- 'description': '#### 📌 1. FINALITÀ DEL TOOL\n'
-                "Automatizza il workflow di 'attivazione' e regolarizzazione dei collaboratori territorio. Gestisce "
-                "sia la creazione di documenti ufficiali (Lettere GDPR) tramite template, sia l'importazione massiva "
-                'di file già esistenti, organizzandoli in una struttura di cartelle standardizzata.\n'
-                '\n'
-                '#### 🚀 2. COME UTILIZZARLO\n'
-                '* **Creazione Manuale:** Inserendo i dati, il tool genera un PDF basato sul template CNA Roma, '
-                'compilando automaticamente anagrafiche e date.\n'
-                '* **Importazione Multipla:** Supporta il Drag & Drop di file multipli. Il sistema estrae i nomi dai '
-                'file e permette di applicare impostazioni globali (es. Tipo Cartella) a tutto il set caricato.\n'
-                "* **Gestione Archivi:** Tramite la dashboard integrata è possibile consultare i profili 'In Sospeso', "
-                'aprirli in Explorer o archiviarli nel percorso di rete configurato.\n'
-                '\n'
-                '#### 🧠 3. LOGICA DI ELABORAZIONE (SPECIFICHE)\n'
-                '* **Automazione MS Word:** Il tool utilizza il motore di Word locale (tramite tabelle COM) per '
-                'modificare il template `.docx`, sostituendo i placeholder dinamici e garantendo una conversione PDF '
-                'fedele al layout originale.\n'
-                '* **Parsing Intelligente Filenames:** La logica di importazione pulisce i nomi dei file da residui '
-                'numerici e caratteri speciali (`_`, `-`, `.`), isolando e capitalizzando Nome e Cognome.\n'
-                '* **Gestione Conflitti Naming:** In caso di omonimia o cartelle già esistenti, il sistema previene '
-                'sovrascritture aggiungendo un timestamp univoco al nome della cartella.\n'
-                '* **Stato UI Persistente:** Gestisce lo scambio (Swap) Nome/Cognome e la sincronizzazione dei dati in '
-                'tempo reale senza interruzioni del flusso di caricamento.\n'
-                '\n'
-                '#### 📂 4. RISULTATO FINALE\n'
-                'Cartelle strutturate nominate `NOME COGNOME (Tipo)` contenenti i documenti pronti per la validazione '
-                "o l'archiviazione finale.",
- 'version': '1.6.0',
- 'params': [],
- 'inputs': []}
+TOOL = {
+    'id': 'attivazione_profili',
+    'name': 'Attivazione Profili (PDF)',
+    'description': (
+        '#### 📌 1. FINALITÀ DEL TOOL\n'
+        "Automatizza il workflow di 'attivazione' e regolarizzazione dei collaboratori territorio. Gestisce "
+        "sia la creazione di documenti ufficiali (Lettere GDPR) tramite template, sia l'importazione massiva "
+        'di file già esistenti, organizzandoli in una struttura di cartelle standardizzata.\n\n'
+        '#### 🚀 2. COME UTILIZZARLO\n'
+        '* **Crea nuovo profilo:** Inserisci Nome, Cognome e Tipo Cartella → il tool genera il PDF dalla lettera GDPR.\n'
+        '* **Importa file esistenti:** Carica i file (PDF, Word, ecc.) → il tool crea le cartelle leggendo i nomi dai filename.\n\n'
+        '#### 📂 4. RISULTATO FINALE\n'
+        'Cartelle strutturate in `In Sospeso/` pronte per la validazione o l\'archiviazione finale.'
+    ),
+    'version': '1.6.0',
+    'params': [
+        {
+            'key': 'modalita',
+            'label': 'Modalità',
+            'type': 'radio',
+            'options': ['Crea nuovo profilo', 'Importa file esistenti'],
+            'default': 'Crea nuovo profilo',
+        },
+        {
+            'key': 'nome',
+            'label': 'Nome',
+            'type': 'text',
+            'placeholder': 'Es: Mario',
+        },
+        {
+            'key': 'cognome',
+            'label': 'Cognome',
+            'type': 'text',
+            'placeholder': 'Es: Rossi',
+        },
+        {
+            'key': 'tipo_cartella',
+            'label': 'Tipo Cartella',
+            'type': 'radio',
+            'options': ['Bancadati', 'INPS', 'BD e INPS'],
+            'default': 'Bancadati',
+        },
+    ],
+    'inputs': [
+        {
+            'key': 'files',
+            'label': 'File da importare *(solo modalità "Importa file esistenti")*',
+            'type': 'file_multi',
+            'required': False,
+        },
+    ],
+}
 
 # -----------------------------------------------------------------------------
 # LOGICA DI BUSINESS
@@ -441,5 +461,61 @@ def get_ui_top():
                         except Exception as e:
                             st.error(f"Errore eliminazione: {e}")
 
-def run(**kwargs):
-    return []
+def run(out_dir, modalita="Crea nuovo profilo", nome="", cognome="",
+        tipo_cartella="Bancadati", files=None, **kwargs):
+    if modalita == "Crea nuovo profilo":
+        if not nome or not cognome:
+            raise ValueError("Nome e Cognome sono obbligatori per la creazione del profilo.")
+
+        success = genera_nuovo_profilo(nome.strip(), cognome.strip(), tipo_cartella)
+        if not success:
+            raise RuntimeError(
+                f"Errore nella generazione del profilo per {nome} {cognome}. "
+                "Verifica che Microsoft Word sia installato e che il template esista."
+            )
+
+        prefix = f"{nome.strip()} {cognome.strip()} ({tipo_cartella})"
+        candidates = sorted(
+            [d for d in DIR_IN_SOSPESO.iterdir() if d.is_dir() and d.name.startswith(prefix)],
+            key=lambda d: d.stat().st_ctime, reverse=True,
+        )
+        if not candidates:
+            raise RuntimeError("Profilo generato ma cartella non trovata in 'In Sospeso'.")
+        return [f for f in candidates[0].rglob("*") if f.is_file()]
+
+    else:  # Importa file esistenti
+        if files is None:
+            raise ValueError("Nessun file caricato per l'importazione.")
+        if not isinstance(files, list):
+            files = [files]
+
+        output_files = []
+        for file_path in files:
+            if not isinstance(file_path, Path):
+                continue
+
+            if nome and cognome:
+                n, c = nome.strip(), cognome.strip()
+            else:
+                n, c = estrai_nome_cognome_da_filename(file_path.name)
+
+            if not n or not c:
+                continue
+
+            folder_name = f"{n} {c} ({tipo_cartella})"
+            dest_folder = DIR_IN_SOSPESO / folder_name
+            if dest_folder.exists():
+                ts = datetime.now().strftime("%H%M%S")
+                dest_folder = DIR_IN_SOSPESO / f"{folder_name}_{ts}"
+            dest_folder.mkdir(parents=True, exist_ok=True)
+
+            dest_file = dest_folder / file_path.name
+            shutil.copy2(file_path, dest_file)
+            output_files.append(dest_file)
+
+        if not output_files:
+            raise ValueError(
+                "Nessun file importato. Assicurati di aver caricato i file "
+                "e che i nomi contengano almeno Nome e Cognome."
+            )
+        return output_files

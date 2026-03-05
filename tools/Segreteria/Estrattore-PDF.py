@@ -33,12 +33,31 @@ TOOL = {
         "#### 🧠 3. LOGICA DI ELABORAZIONE (SPECIFICHE)\n"
         "* **Computer Vision (OpenCV):** Utilizza algoritmi di Edge Detection e Rilevamento Prospettico per ritagliare automaticamente il documento ed eliminare lo sfondo.\n"
         "* **Image Enhancement:** Applica filtri di nitidezza (Sharpening), bilanciamento contrasto (CLAHE) e conversione in bianco e nero per massimizzare la leggibilità del testo.\n"
-        "* **Secure Tunneling:** Crea un ponte SSH temporaneo verso l'esterno per permettere lo scambio dati mobile-PC senza configurazioni di rete complesse.\n\n"
+        "* **Secure Tunneling:** Crea un tunnel Cloudflare temporaneo verso l'esterno per permettere lo scambio dati mobile-PC senza configurazioni di rete complesse.\n\n"
         "#### 📂 4. RISULTATO FINALE\n"
         "File PDF ottimizzati (peso ridotto, layout dritto) archiviati automaticamente nelle cartelle fornitore su Disco F:."
     ),
-    'inputs': [],
-    'params': []
+    'inputs': [
+        {
+            'key': 'avviso_dashboard',
+            'label': (
+                '⚠️ **Tool Dashboard Interattivo** — questo tool gestisce un tunnel Cloudflare e richiede '
+                'interazione in tempo reale (avvio server, QR Code, upload mobile, archiviazione). '
+                'Il pulsante **Esegui** produce solo un file di istruzioni. '
+                'Per la funzionalità completa usa la versione Streamlit originale.'
+            ),
+            'type': 'warning',
+        },
+    ],
+    'params': [
+        {
+            'key': 'output_path',
+            'label': 'Cartella Destinazione Archivio',
+            'type': 'text',
+            'default': r'F:\Cna Pensionati\CNA PENSIONATI 2026\Fatture',
+            'placeholder': r'Es: F:\CNA\Fatture',
+        },
+    ],
 }
 
 # ==============================================================================
@@ -56,9 +75,9 @@ EXTENSION_DIR = SCRIPT_PATH.parent / "extension" / "x estrattore - pdf"
 EXTENSION_DIR.mkdir(parents=True, exist_ok=True)
 CONFIG_FILE = EXTENSION_DIR / "config_manual.json"
 
-# Regex per catturare URL da localhost.run. Il formato attuale è:
-# "https://random-hex.lhr.life" (oppure il vecchio .localhost.run)
-URL_RE_LHR = re.compile(r"https://[a-zA-Z0-9-]+\.(lhr\.life|localhost\.run)", re.I)
+# Regex per catturare URL da Cloudflare Tunnel (cloudflared).
+# Formato: "https://random-words.trycloudflare.com"
+URL_RE_CF = re.compile(r"https://[a-zA-Z0-9-]+\.trycloudflare\.com", re.I)
 
 VALID_EXTS = {".pdf", ".jpg", ".jpeg", ".png", ".webp"}
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp"}
@@ -488,23 +507,21 @@ def kill_port_win(port: int) -> None:
                         subprocess.run(f"taskkill /F /PID {pid}", shell=True, capture_output=True, creationflags=CREATE_NO_WINDOW)
     except: pass
 
-def kill_ssh_processes() -> None:
-    """Termina tutti i processi SSH orfani per evitare conflitti di tunnel."""
+def kill_cloudflared_processes() -> None:
+    """Termina tutti i processi cloudflared orfani per evitare conflitti di tunnel."""
     try:
-        subprocess.run("taskkill /F /IM ssh.exe", shell=True, capture_output=True, creationflags=CREATE_NO_WINDOW)
+        subprocess.run("taskkill /F /IM cloudflared.exe", shell=True, capture_output=True, creationflags=CREATE_NO_WINDOW)
     except: pass
 
-def ensure_ssh_key():
-    """Genera una chiave SSH se non esiste, necessaria per localhost.run"""
-    ssh_dir = Path.home() / ".ssh"
-    ssh_dir.mkdir(parents=True, exist_ok=True)
-    key_path = ssh_dir / "id_rsa"
-    if not key_path.exists():
-        log_event("Generating SSH Key...")
-        subprocess.run(
-            ["ssh-keygen", "-t", "rsa", "-b", "2048", "-f", str(key_path), "-N", ""],
-            creationflags=CREATE_NO_WINDOW
-        )
+def find_cloudflared() -> str:
+    """Restituisce il percorso dell'eseguibile cloudflared (PATH o bin/ locale)."""
+    local = TOOLBOX_ROOT / "bin" / "cloudflared.exe"
+    if local.exists():
+        return str(local)
+    found = shutil.which("cloudflared")
+    if found:
+        return found
+    return "cloudflared"  # Fallback: assume sia in PATH
 
 # ==============================================================================
 # FASTAPI SERVER
@@ -520,7 +537,7 @@ if "--server" in sys.argv:
 
     @server_app.get("/health")
     def health_check():
-        return {"status": "ok", "source": "Toolbox-SSH"}
+        return {"status": "ok", "source": "Toolbox-CF"}
 
     # ==========================================================================
     # TESTING BLOCK - Mobile UI Enhanced
@@ -759,75 +776,81 @@ if "--server" in sys.argv:
             return HTMLResponse(get_mobile_html(token, f"❌ Errore Critico: {e}"))
 
     def run_server_process(port: int):
-        log_event("--- START SSH SERVER ---")
+        log_event("--- START CLOUDFLARE TUNNEL SERVER ---")
         kill_port_win(port)
         time.sleep(0.5)
-        
-        # 0. Ensure SSH Key
-        ensure_ssh_key()
 
-        # 1. AVVIA UVICORN IN BACKGROUND (così è pronto quando SSH si connette)
+        # 1. AVVIA UVICORN IN BACKGROUND (così è pronto quando cloudflared si connette)
         def _run_uvicorn():
             log_event(f"Uvicorn Starting on 127.0.0.1:{port}...")
             try:
                 uvicorn.run(server_app, host="127.0.0.1", port=port, log_level="warning")
             except Exception as e:
                 log_event(f"Uvicorn Crash: {e}")
-        
+
         uvicorn_thread = threading.Thread(target=_run_uvicorn, daemon=True)
         uvicorn_thread.start()
         time.sleep(1.0)  # Dai tempo a Uvicorn di partire
 
-        # 2. SSH TUNNEL CON AUTO-RICONNESSIONE
+        # 2. CLOUDFLARE TUNNEL CON AUTO-RICONNESSIONE
+        cf_bin = find_cloudflared()
         MAX_RETRIES = 999  # Praticamente infinito
         retry_count = 0
-        
+
         while retry_count < MAX_RETRIES:
             try:
                 TUNNEL_URL_FILE.unlink(missing_ok=True)
             except: pass
-            
-            log_event(f"SSH Tunnel Starting (attempt {retry_count + 1})...")
-            
-            # Comando SSH con keepalive aggressivo
-            cmd = [
-                "ssh", 
-                "-o", "StrictHostKeyChecking=no",
-                "-o", "ServerAliveInterval=15",   # Keepalive ogni 15s
-                "-o", "ServerAliveCountMax=2",    # Max 2 tentativi falliti
-                "-o", "ExitOnForwardFailure=yes", # Esci subito se port forward fallisce
-                "-o", "ConnectTimeout=30",        # Timeout connessione 30s
-                "-R", f"80:127.0.0.1:{port}",
-                "nokey@localhost.run"
-            ]
-            
+
+            log_event(f"Cloudflare Tunnel Starting (attempt {retry_count + 1}) using: {cf_bin}")
+
+            cmd = [cf_bin, "tunnel", "--url", f"http://127.0.0.1:{port}", "--no-autoupdate"]
+
             proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, creationflags=CREATE_NO_WINDOW)
-            
-            # Leggi l'output SSH nel main thread (tiene vivo il processo)
+
+            # Leggi l'output nel main thread (tiene vivo il processo)
             for line in proc.stdout:
-                log_event(f"SSH: {line.strip()}")
-                m = URL_RE_LHR.search(line)
+                log_event(f"CF: {line.strip()}")
+                m = URL_RE_CF.search(line)
                 if m:
                     try: TUNNEL_URL_FILE.write_text(m.group(0), encoding="utf-8")
                     except: pass
-            
-            # SSH è terminato - aspetta e riprova
+
+            # cloudflared è terminato - aspetta e riprova
             exit_code = proc.wait()
-            log_event(f"SSH Tunnel Closed (exit code: {exit_code}). Reconnecting in 5s...")
+            log_event(f"Cloudflare Tunnel Closed (exit code: {exit_code}). Reconnecting in 5s...")
             retry_count += 1
-            time.sleep(5)  # Aspetta 5 secondi prima di riconnettersi
-        
-        log_event("SSH Tunnel: Max retries reached.")
+            time.sleep(5)
+
+        log_event("Cloudflare Tunnel: Max retries reached.")
 
 # ==============================================================================
 # UI LOGIC
 # ==============================================================================
-def run(inputs, params, out_dir): return []
+def run(out_dir, output_path="", **kwargs):
+    """Produce un file di istruzioni (tool interattivo, non eseguibile in batch)."""
+    dest_info = r"F:\Cna Pensionati\CNA PENSIONATI 2026\Fatture" if not output_path else output_path
+    info_file = out_dir / "Istruzioni_Estrattore_Fatture.txt"
+    info_file.write_text(
+        "ESTRATTORE FATTURE (MOBILE) — ISTRUZIONI\n"
+        "=========================================\n\n"
+        "Questo tool funziona come dashboard interattiva con tunnel Cloudflare.\n"
+        "Per l'uso completo avvialo dalla versione Streamlit originale:\n\n"
+        "  python tools/Segreteria/Estrattore-PDF.py\n\n"
+        "Workflow:\n"
+        "  1. Clicca 'Avvia Sync' per creare il tunnel Cloudflare\n"
+        "  2. Scansiona il QR Code con il telefono\n"
+        "  3. Carica foto delle fatture dal cellulare\n"
+        "  4. Elabora e archivia dalla dashboard\n\n"
+        f"Cartella destinazione configurata: {dest_info}\n",
+        encoding="utf-8",
+    )
+    return [info_file]
 
 def check_public_health(url: str) -> bool:
     try:
         resp = requests.get(f"{url.rstrip('/')}/health", timeout=5)
-        return resp.status_code == 200 and "Toolbox-SSH" in resp.text
+        return resp.status_code == 200 and "Toolbox" in resp.text
     except: return False
 
 def get_ui_top():
@@ -836,7 +859,7 @@ def get_ui_top():
     if "tunnel_verified" not in st.session_state: st.session_state.tunnel_verified = False
 
     with st.container():
-        st.subheader("🔄 Sincronizzazione SSH Stabile")
+        st.subheader("🔄 Sincronizzazione Cloudflare Tunnel")
         
         is_running = st.session_state.srv is not None and st.session_state.srv.poll() is None
         
@@ -857,28 +880,28 @@ def get_ui_top():
         if c2.button("⏹ Stop / Reset", disabled=not is_running, use_container_width=True, key="stop"):
             if st.session_state.srv: st.session_state.srv.terminate()
             st.session_state.srv = None
-            kill_ssh_processes()  # Pulisci tutti i tunnel SSH orfani
+            kill_cloudflared_processes()  # Pulisci tutti i tunnel cloudflared orfani
             kill_port_win(PORT)
             st.rerun()
         
         # KILL ZOMBIE (sempre attivo)
         c3 = st.columns([1])[0]
-        if c3.button("🔥 Kill Zombie", use_container_width=True, key="kill_zombie", help="Termina tutti i processi SSH orfani"):
-            kill_ssh_processes()
+        if c3.button("🔥 Kill Zombie", use_container_width=True, key="kill_zombie", help="Termina tutti i processi cloudflared orfani"):
+            kill_cloudflared_processes()
             kill_port_win(PORT)
             st.success("✅ Processi zombie terminati!")
             time.sleep(1)
             st.rerun()
 
         if is_running:
-            st.info("🚀 Tunnel SSH attivo. In attesa di assegnazione URL...")
+            st.info("🚀 Cloudflare Tunnel attivo. In attesa di assegnazione URL...")
             
             if not st.session_state.tunnel_verified:
                 found = None
                 if TUNNEL_URL_FILE.exists():
                     try: 
                         t = TUNNEL_URL_FILE.read_text("utf-8").strip()
-                        if URL_RE_LHR.match(t): found = t
+                        if URL_RE_CF.match(t): found = t
                     except: pass
                 
                 if found:
@@ -887,7 +910,7 @@ def get_ui_top():
                     st.session_state.tunnel_verified = True
                     st.rerun()
                 else:
-                    st.caption("Connessione a localhost.run... (richiede qualche secondo)")
+                    st.caption("Connessione a Cloudflare... (richiede qualche secondo)")
                     time.sleep(2)
                     st.rerun()
             else:
@@ -896,7 +919,7 @@ def get_ui_top():
                 if TUNNEL_URL_FILE.exists():
                     try:
                         fresh_url = TUNNEL_URL_FILE.read_text("utf-8").strip()
-                        if URL_RE_LHR.match(fresh_url): current_url = fresh_url
+                        if URL_RE_CF.match(fresh_url): current_url = fresh_url
                     except: pass
                 
                 st.success("✅ **Connessione Stabile OK!**")

@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Toolbox CNA</title>
+
+  <!-- Inter font — unica dipendenza esterna -->
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+
+  <link rel="stylesheet" href="/static/css/app.css"/>
+</head>
+<body>
+
+<div id="shell">
+
+  <!-- ══════════════════ SIDEBAR ══════════════════ -->
+  <aside id="sidebar">
+
+    <!-- Logo -->
+    <div class="s-logo">
+      <div class="s-logo-box">🧰</div>
+      <span class="s-logo-text">Toolbox CNA</span>
+    </div>
+
+    <!-- User card -->
+    <div class="s-user">
+      <div class="s-user-av">👤</div>
+      <div>
+        <div class="s-user-name">Strumenti Operativi</div>
+        <div class="s-user-sub">CNA</div>
+      </div>
+      <div class="s-user-chev">⌄</div>
+    </div>
+
+    <!-- Navigazione (popolata da JS) -->
+    <nav class="s-nav" id="sb-nav"></nav>
+
+    <!-- Footer -->
+    <div class="s-foot">
+      <button class="s-foot-btn" onclick="reloadTools()">
+        <div class="s-foot-ico">🔄</div>
+        Aggiorna tool
+      </button>
+      <button class="s-foot-btn" onclick="openSettings()">
+        <div class="s-foot-ico">⚙️</div>
+        Impostazioni AI
+      </button>
+    </div>
+
+  </aside>
+
+  <!-- ══════════════════ MAIN ══════════════════ -->
+  <div id="main">
+
+    <!-- Topbar -->
+    <header id="topbar">
+      <div class="tb-titles" id="tb-area">
+        <h2>Benvenuto!</h2>
+        <p>Seleziona un tool per iniziare.</p>
+      </div>
+      <div class="tb-right">
+        <div class="tb-search">
+          <span class="tb-search-ico">🔍</span>
+          <input
+            type="text"
+            id="search-input"
+            placeholder="Cerca tool o regione…"
+            oninput="onSearch(this.value)"
+            autocomplete="off"
+          />
+        </div>
+        <button class="tb-ai-btn" id="tb-ai-btn" onclick="openAIPanel()" title="Chat AI">
+          🤖 <span>Chat AI</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Body = contenuto + pannello destro -->
+    <div id="body">
+      <main id="content">
+        <!-- Popolato da JS -->
+      </main>
+      <aside id="rpanel">
+        <!-- Popolato da JS -->
+      </aside>
+    </div>
+
+  </div><!-- #main -->
+
+</div><!-- #shell -->
+
+<!-- ══════════════════ SETTINGS MODAL ══════════════════ -->
+<div class="backdrop" id="cfg-modal" onclick="if(event.target===this)closeSettings()">
+  <div class="modal">
+    <div class="modal-hd">
+      <span class="modal-hd-title">⚙️ Impostazioni AI</span>
+      <button class="modal-x" onclick="closeSettings()">✕</button>
+    </div>
+    <div class="modal-bd">
+      <div class="modal-row">
+        <label class="modal-lbl">Model ID</label>
+        <input class="fi" type="text" id="cfg-model"
+          placeholder="es. arcee-ai/trinity-large-preview:free"/>
+      </div>
+      <div class="modal-row">
+        <label class="modal-lbl">Base URL API</label>
+        <input class="fi" type="text" id="cfg-url"
+          placeholder="https://openrouter.ai/api/v1"/>
+      </div>
+      <div class="modal-row">
+        <label class="modal-lbl">API Key</label>
+        <input class="fi" type="password" id="cfg-key"
+          placeholder="sk-…"/>
+      </div>
+      <button class="modal-save" onclick="saveSettings()">💾 Salva</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════ TOAST AREA ══════════════════ -->
+<div id="toasts"></div>
+
+<script src="/static/js/app.js"></script>
+</body>
+</html>

@@ -91,6 +91,12 @@ DATA_DIR = BASE_DIR / "data"  # opzionale: data/<Regione>/...
 # Ensure imports from project root work even if Streamlit changes working dir
 sys.path.insert(0, str(BASE_DIR))
 
+# Aggiungi core/ a sys.path per import di moduli fratelli (styles, ecc.)
+_core_dir = Path(__file__).resolve().parent
+if str(_core_dir) not in sys.path:
+    sys.path.insert(0, str(_core_dir))
+from styles import inject_styles as _inject_styles  # noqa: E402
+
 SUPPORTED_INPUT_TYPES = {"txt_multi", "txt_single", "xlsx_single", "file_multi", "file_single", "warning", "info", "error", "success", "markdown"}
 SUPPORTED_PARAM_TYPES = {"select", "radio", "checkbox", "number", "text", "textarea", "multiselect", "dynamic_info", "folder", "file_path_info"}
 
@@ -1213,30 +1219,7 @@ def render_tool(tool: Dict[str, Any]) -> None:
     tool_uid = str(tool.get("uid"))
     tool_title = str(tool.get("name", tool.get("id", "Tool")))
 
-    st.markdown(
-        """<style>
-/* Header tool: colonne si restringono al contenuto → bottone ⚙️ incollato al titolo */
-/* :not(:has(stVerticalBlockBordered)) esclude il blocco 70/30 esterno che contiene st.container(border=True) */
-div[data-testid="stHorizontalBlock"]:has(h1):not(:has([data-testid="stVerticalBlockBordered"])) {
-    gap: 6px !important;
-    align-items: center !important;
-}
-div[data-testid="stHorizontalBlock"]:has(h1):not(:has([data-testid="stVerticalBlockBordered"])) > div[data-testid="stColumn"] {
-    flex: 0 0 auto !important;
-    width: fit-content !important;
-    max-width: 92% !important;
-}
-div[data-testid="stHorizontalBlock"]:has(h1):not(:has([data-testid="stVerticalBlockBordered"])) > div[data-testid="stColumn"]:last-child {
-    margin-top: 18px !important;
-}
-div[data-testid="stHorizontalBlock"]:has(h1):not(:has([data-testid="stVerticalBlockBordered"])) div[data-testid="stTooltipHoverTarget"] {
-    justify-content: flex-start !important;
-    width: auto !important;
-}
-</style>""",
-        unsafe_allow_html=True,
-    )
-
+    # CSS header tool ora in core/styles.py (sezione 9)
     c1, c2 = st.columns([0.95, 0.05])
     with c1:
         # Titolo su riga singola (no wrap)
@@ -1623,270 +1606,9 @@ if "assistant_model_id" not in st.session_state or "assistant_base_url" not in s
     st.session_state.assistant_model_id = ai_cfg.get("model_id", "arcee-ai/trinity-large-preview:free")
     st.session_state.assistant_base_url = ai_cfg.get("base_url", "https://openrouter.ai/api/v1")
 
-# Iniezione CSS Globale CNA (Dinamica)
+# Iniezione CSS Globale CNA (Dinamica) — gestita da core/styles.py
 l_val = st.session_state["sidebar_lightness"]
-st.markdown(f"""
-    <style>
-    /* TEMA CNA - BLU ISTITUZIONALE PROFESSIONALE */
-    [data-testid="stAppViewContainer"], .main {{ background-color: #f0f4f8 !important; color: #003366 !important; }}
-    [data-testid="stHeader"] {{ background-color: rgba(240, 244, 248, 0.8) !important; }}
-    [data-testid="stSidebar"] {{ 
-        background-color: hsl(210, 100%, {l_val}%) !important; 
-        border-right: 1px solid hsl(210, 100%, {max(0, l_val-10)}%) !important; 
-    }}
-    /* Sidebar Text - Bianco su Blu CNA */
-    [data-testid="stSidebar"] * {{ color: #ffffff !important; }}
-    
-    /* SIDEBAR TEXT & EXPANDERS - FIX TOTALE COLORE BIANCO E BORDI FINE */
-    [data-testid="stSidebar"] [data-testid="stExpander"] summary,
-    [data-testid="stSidebar"] [data-testid="stExpander"] summary *,
-    [data-testid="stSidebar"] details summary, 
-    [data-testid="stSidebar"] details summary * {{
-        color: #ffffff !important;
-        fill: #ffffff !important;
-        text-decoration: none !important;
-    }}
-
-    /* Bordi Bianchi Fini per Expanders (Regioni) - Fix Totale */
-    [data-testid="stSidebar"] [data-testid="stExpander"] {{
-        border: 1px solid rgba(255, 255, 255, 0.4) !important;
-        background-color: transparent !important;
-        border-radius: 8px !important;
-        margin-bottom: 10px !important;
-        padding: 0 !important;
-    }}
-
-    /* Blocca lo sfondo trasparente su OGNI stato interno (Aperto, Chiuso, Focus) */
-    [data-testid="stSidebar"] [data-testid="stExpander"] details,
-    [data-testid="stSidebar"] [data-testid="stExpander"] details > div,
-    [data-testid="stSidebar"] [data-testid="stExpander"] details[open],
-    [data-testid="stSidebar"] [data-testid="stExpander"] details[open] > div,
-    [data-testid="stSidebar"] [data-testid="stExpander"] summary {{
-        border: none !important;
-        background-color: transparent !important;
-        background: transparent !important;
-        box-shadow: none !important;
-    }}
-
-    /* Hover leggero sul titolo per feedback visivo */
-    [data-testid="stSidebar"] [data-testid="stExpander"] summary:hover {{
-        background-color: rgba(255, 255, 255, 0.1) !important;
-    }}
-
-    /* Bordi Bianchi Fini per i Pulsanti dei Tool */
-    [data-testid="stSidebar"] div[data-testid="stButton"] button {{
-        border: 1px solid rgba(255, 255, 255, 0.3) !important;
-        background-color: rgba(255, 255, 255, 0.1) !important;
-        color: #ffffff !important;
-        border-radius: 4px !important;
-        margin: 2px 0 !important;
-        width: 100% !important;
-        white-space: normal !important;
-        word-break: break-word !important;
-        height: auto !important;
-        min-height: 38px !important;
-        padding: 6px 10px !important;
-        line-height: 1.35 !important;
-    }}
-    [data-testid="stSidebar"] div[data-testid="stButton"] button:hover {{
-        background-color: rgba(255, 255, 255, 0.2) !important;
-        border-color: #ffffff !important;
-    }}
-
-    /* Bordi Bianchi Fini per gli Input (Cerca, Root) - Sfondo Bianco e Testo Grigio */
-    [data-testid="stSidebar"] div[data-testid="stTextInput"] input {{
-        border: 1px solid rgba(255, 255, 255, 0.5) !important;
-        background-color: #ffffff !important; /* Sfondo Bianco */
-        color: #555555 !important; /* Testo Grigio */
-        border-radius: 4px !important;
-        padding: 8px !important;
-    }}
-    
-    /* Forza il colore del testo per la leggibilità */
-    [data-testid="stSidebar"] input {{
-        color: #555555 !important;
-        -webkit-text-fill-color: #555555 !important;
-    }}
-
-    /* Stile Matita (Edit) nella Sidebar */
-    [data-testid="stSidebar"] [data-testid="column"]:nth-child(2) button {{
-        background-color: #ffffff !important;
-        color: #0054a6 !important;
-        border: 1px solid #ffffff !important;
-        border-radius: 4px !important;
-        padding: 0 !important;
-        margin: 2px 0 !important;
-        min-height: 38px !important;
-        height: 38px !important;
-        width: 100% !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        font-size: 1.1rem !important;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.2) !important;
-    }}
-    [data-testid="stSidebar"] [data-testid="column"]:nth-child(2) button:hover {{
-        background-color: #f0f7ff !important;
-        border-color: #ffffff !important;
-        transform: scale(1.05);
-    }}
-
-    /* Card e Contenitori - Bordi CNA Dinamici */
-    div[data-testid="stVerticalBlockBordered"] {{ 
-        background-color: #ffffff !important; 
-        border: 1px solid #c0d1e2 !important; 
-        border-left: 6px solid hsl(210, 100%, {l_val}%) !important;
-        box-shadow: 0 4px 15px rgba(0,51,102,0.12) !important;
-    }}
-    
-    /* Titles e Testi Dinamici */
-    h1, h2, h3, h4 {{ color: hsl(210, 100%, {l_val}%) !important; font-weight: bold !important; }}
-    .stMarkdown, .stCaption, p, span, label {{ color: hsl(210, 100%, {max(0, l_val-15)}%) !important; }}
-    
-    /* Bottoni reali (st.button) — NON usa il selettore generico "button"
-       per evitare di colorare anche il ? del tooltip (che Streamlit rende
-       come <button> ma NON è dentro [data-testid="stButton"]) */
-    [data-testid="stButton"] button {{
-        background-color: hsl(210, 100%, {l_val}%) !important;
-        color: #ffffff !important;
-        border: none !important;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.15) !important;
-        font-weight: 500 !important;
-        height: 38px !important;
-        min-height: 38px !important;
-        padding: 0 12px !important;
-        line-height: 38px !important;
-        border-radius: 6px !important;
-        display: inline-flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        font-size: 0.95rem !important;
-    }}
-
-    /* Testo interno ai bottoni reali */
-    [data-testid="stButton"] button p,
-    [data-testid="stButton"] button span {{
-        background-color: transparent !important;
-        background: transparent !important;
-        color: #ffffff !important;
-        margin: 0 !important;
-        padding: 0 !important;
-    }}
-
-    [data-testid="stButton"] button:hover {{
-        background-color: hsl(210, 100%, {max(0, l_val-10)}%) !important;
-        box-shadow: 0 4px 8px rgba(0,0,0,0.2) !important;
-    }}
-    [data-testid="stButton"] button:hover * {{
-        color: #ffffff !important;
-    }}
-    
-    /* FIX SOVRAPPOSIZIONE E BORDI INPUT DINAMICI */
-    div[data-baseweb="input"], 
-    div[data-baseweb="select"] > div,
-    div[data-testid="stTextInput"] > div,
-    div[data-testid="stTextArea"] > div,
-    div[data-testid="stNumberInput"] > div {{ 
-        border: 1px solid hsl(210, 100%, {l_val}%) !important; 
-        background-color: #ffffff !important;
-        border-radius: 4px !important;
-        overflow: hidden !important;
-    }}
-
-    div[data-testid="stTextInput"] input, 
-    div[data-testid="stTextArea"] textarea,
-    div[data-testid="stNumberInput"] input,
-    div[data-baseweb="select"] span {{ 
-        border: none !important;
-        box-shadow: none !important;
-        background-color: transparent !important;
-        color: #555555 !important; /* Testo Grigio scuro per contrasto su bianco */
-        outline: none !important;
-    }}
-
-    /* FIX BOTTONI +/- (Number Input) Dinamici */
-    div[data-testid="stNumberInput"] button {{
-        background-color: hsl(210, 100%, {l_val}%) !important;
-        color: #ffffff !important;
-        border: none !important;
-        border-left: 1px solid rgba(255, 255, 255, 0.3) !important;
-        margin: 0 !important;
-        height: 100% !important;
-        border-radius: 0 !important;
-    }}
-    
-    div[data-testid="stNumberInput"] button:hover {{
-        background-color: hsl(210, 100%, {max(0, l_val-10)}%) !important;
-    }}
-
-    /* Bottoni azione (📂, 🔍, ✏️) nei blocchi orizzontali:
-       larghezza 100% della colonna, emoji ben visibile,
-       allineati verticalmente all'input (margin-top compensa la label sopra l'input) */
-    [data-testid="stHorizontalBlock"] [data-testid="stButton"] button {{
-        width: 100% !important;
-        font-size: 1.2rem !important;
-        padding: 0 8px !important;
-    }}
-    [data-testid="stHorizontalBlock"] [data-testid="stButton"] {{
-        margin-top: auto !important;
-    }}
-
-    /* Bottone "Sfoglia file..." - stBaseButton-secondary ha specificità maggiore del selettore button globale */
-    [data-testid="stBaseButton-secondary"],
-    div[data-testid="stFileUploader"] button,
-    div[data-testid="stFileUploaderDropzone"] button {{
-        background-color: hsl(210, 100%, {l_val}%) !important;
-        color: #ffffff !important;
-        border: none !important;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.15) !important;
-        font-weight: 500 !important;
-    }}
-    [data-testid="stBaseButton-secondary"]:hover,
-    div[data-testid="stFileUploader"] button:hover {{
-        background-color: hsl(210, 100%, {max(0, l_val-10)}%) !important;
-    }}
-    [data-testid="stBaseButton-secondary"] p,
-    [data-testid="stBaseButton-secondary"] span {{
-        color: #ffffff !important;
-    }}
-
-    /* Drag & Drop (File Uploader) Dinamico */
-    div[data-testid="stFileUploader"] {{
-        background-color: #f8fafc !important;
-        border: 2px dashed hsl(210, 100%, {l_val}%) !important;
-        border-radius: 12px !important;
-        padding: 15px !important;
-        transition: all 0.3s ease;
-    }}
-    div[data-testid="stFileUploader"]:hover {{
-        background-color: #f0f7ff !important;
-        border-color: hsl(210, 100%, {max(0, l_val-10)}%) !important;
-    }}
-    div[data-testid="stFileUploader"] section {{ background-color: transparent !important; }}
-
-    ::placeholder {{
-        color: #aaaaaa !important;
-        opacity: 1 !important;
-        -webkit-text-fill-color: #aaaaaa !important;
-    }}
-    ::-webkit-input-placeholder {{
-        color: #aaaaaa !important;
-        opacity: 1 !important;
-        -webkit-text-fill-color: #aaaaaa !important;
-    }}
-    /* Testi descrittivi (label) Dinamici */
-    label {{ color: hsl(210, 100%, {max(0, l_val-10)}%) !important; font-weight: 600 !important; }}
-    
-    /* Footer/Caption */
-    .stCaption {{ color: #4a6a8a !important; }}
-
-    /* STILE SPECIALE PER ASSISTENTE OPENROUTER */
-    div[data-testid="stSidebar"] [data-testid="stExpander"]:has(input[key="assistant_query"]) {{
-        border: 2px solid #FFD700 !important;
-        background-color: rgba(255, 215, 0, 0.05) !important;
-    }}
-    </style>
-""", unsafe_allow_html=True)
+_inject_styles(l_val)
 
 tools = load_tools_cached()
 sidebar_regions(tools)
@@ -1903,38 +1625,8 @@ else:
         set_selected_tool(selected.get("uid", ""))
 
     # LAYOUT DINAMICO PANNELLO LATERALE (Integrato 70/30) con TWIN BOXES NATIVI
+    # CSS split-layout ora in core/styles.py (sezione 10)
     if st.session_state["show_assistant"]:
-        # CSS iniettato QUI (prima dei columns) con selector DOM reali verificati dall'inspector.
-        # Target: stColumn > stVerticalBlock (il primo figlio diretto di ogni colonna del 70/30).
-        # Il selector usa la catena completa con > per evitare collisioni con i VBlock annidati nel tool.
-        st.markdown("""
-            <style>
-            /* 1. Rimuove il max-width sul contenitore principale → pannelli occupano tutta la larghezza */
-            [data-testid="stMainBlockContainer"] {
-                max-width: 100% !important;
-                padding-left: 1rem !important;
-                padding-right: 1rem !important;
-            }
-            /* 2. Allinea le colonne 70/30 in cima (evita che la colonna corta scivoli in basso) */
-            [data-testid="stMainBlockContainer"]
-            > [data-testid="stVerticalBlock"]
-            > [data-testid="stHorizontalBlock"] {
-                align-items: flex-start !important;
-            }
-            /* 3. Altezza fissa + scroll sui box delle colonne */
-            [data-testid="stMainBlockContainer"]
-            > [data-testid="stVerticalBlock"]
-            > [data-testid="stHorizontalBlock"]
-            > [data-testid="stColumn"]
-            > [data-testid="stVerticalBlockBordered"] {
-                height: calc(100vh - 80px) !important;
-                max-height: calc(100vh - 80px) !important;
-                overflow-y: auto !important;
-                padding: 1rem !important;
-                box-sizing: border-box !important;
-            }
-            </style>
-        """, unsafe_allow_html=True)
         col_main, col_assist = st.columns([0.7, 0.3], gap="large")
         with col_main:
             # BOX 1: TOOL (Altezza gestita da CSS)

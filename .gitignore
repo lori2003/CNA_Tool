@@ -1,21 +1,63 @@
-# Ambiente virtuale Python
+# ── Ambiente virtuale Python ──
 .venv/
 venv/
 env/
 
-# Cache Python
+# ── Cache Python ──
 __pycache__/
 *.pyc
 *.pyo
+*.pyd
 
-# Log
+# ── Log ──
 *.log
 
-# File temporanei / immagini di lavoro
+# ── Variabili d'ambiente (segreti) ──
+.env
+ai_config.json
+
+# ── Output generato / dati locali ──
+data/output/
+data/active_context.json
+
+# ── Binari pesanti ──
+bin/
+
+# ── File di lavoro / immagine ──
+image.png
 image copy.png
+image copy 2.png
+image copy 3.png
 
-# Configurazione locale Claude
+# ── Directory di sviluppo locale ──
+debugging/
+sync_bridge/
+memory/
+Contesto/
+rIFERIMENTO_fRONTEND/
+streamlit-cheat-sheet/
+
+# ── Script di avvio locali (Windows) ──
+avvia_toolbox.vbs
+ferma_toolbox.vbs
+start_web.bat
+
+# ── File test / dev ──
+Test_Confrontodiretti_2.py
+
+# ── IDE / editor ──
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ── Config locale Claude/Agent ──
 .claude/
-
-# Agent config locale
 .agent/
+.streamlit/
+
+# ── OS ──
+.DS_Store
+Thumbs.db
+desktop.ini

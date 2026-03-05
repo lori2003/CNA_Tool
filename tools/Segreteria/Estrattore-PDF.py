@@ -27,36 +27,53 @@ TOOL = {
         "Permette di trasformare foto scattate da smartphone o file PDF in documenti digitali archiviabili, "
         "applicando un effetto 'scanner' professionale e gestendo l'upload remoto via tunnel sicuro.\n\n"
         "#### 🚀 2. COME UTILIZZARLO\n"
-        "1. **Connessione:** Scansiona il QR Code con il cellulare per aprire la pagina di upload remoto.\n"
-        "2. **Scatto:** Carica le foto delle fatture/ricevute indicando Fornitore e Descrizione.\n"
-        "3. **In Toolbox:** I file appaiono nella dashboard; clicca 'Archivia' per convertirli in PDF e spostarli nella cartella finale.\n\n"
-        "#### 🧠 3. LOGICA DI ELABORAZIONE (SPECIFICHE)\n"
-        "* **Computer Vision (OpenCV):** Utilizza algoritmi di Edge Detection e Rilevamento Prospettico per ritagliare automaticamente il documento ed eliminare lo sfondo.\n"
-        "* **Image Enhancement:** Applica filtri di nitidezza (Sharpening), bilanciamento contrasto (CLAHE) e conversione in bianco e nero per massimizzare la leggibilità del testo.\n"
-        "* **Secure Tunneling:** Crea un tunnel Cloudflare temporaneo verso l'esterno per permettere lo scambio dati mobile-PC senza configurazioni di rete complesse.\n\n"
+        "1. **Connessione:** Spunta *Avvia Sync* e clicca **Esegui** per creare il tunnel Cloudflare. "
+        "Aggiorna la pagina per vedere il QR Code / URL da inviare al telefono.\n"
+        "2. **Scatto:** Dal telefono apri l'URL e carica le foto delle fatture indicando Fornitore e Descrizione.\n"
+        "3. **Archiviazione:** Carica file manualmente oppure spunta *Archivia tutti* e clicca **Esegui** "
+        "per convertire e spostare tutti i file in coda nella cartella di destinazione.\n\n"
+        "#### 🧠 3. LOGICA DI ELABORAZIONE\n"
+        "* **Computer Vision (OpenCV):** Edge detection + correzione prospettiva + CLAHE.\n"
+        "* **Secure Tunneling:** Tunnel Cloudflare temporaneo (cloudflared) — nessuna configurazione di rete.\n\n"
         "#### 📂 4. RISULTATO FINALE\n"
-        "File PDF ottimizzati (peso ridotto, layout dritto) archiviati automaticamente nelle cartelle fornitore su Disco F:."
+        "File PDF ottimizzati archiviati nelle cartelle fornitore su Disco F:."
     ),
     'inputs': [
-        {
-            'key': 'avviso_dashboard',
-            'label': (
-                '⚠️ **Tool Dashboard Interattivo** — questo tool gestisce un tunnel Cloudflare e richiede '
-                'interazione in tempo reale (avvio server, QR Code, upload mobile, archiviazione). '
-                'Il pulsante **Esegui** produce solo un file di istruzioni. '
-                'Per la funzionalità completa usa la versione Streamlit originale.'
-            ),
-            'type': 'warning',
-        },
+        {'key': '_sec_tunnel',   'label': '### 🔄 Sincronizzazione Cloudflare Tunnel', 'type': 'markdown'},
+        {'key': '_sec_upload',   'label': '### 📤 Caricamento Manuale dal PC',         'type': 'markdown'},
+        {'key': 'files_manuali', 'label': 'Carica file (PDF, JPG, PNG, WEBP)',         'type': 'file_multi'},
+        {'key': '_sec_dash',     'label': '### 📂 Dashboard Gestionale',               'type': 'markdown'},
     ],
     'params': [
-        {
-            'key': 'output_path',
-            'label': 'Cartella Destinazione Archivio',
-            'type': 'text',
-            'default': r'F:\Cna Pensionati\CNA PENSIONATI 2026\Fatture',
-            'placeholder': r'Es: F:\CNA\Fatture',
-        },
+        # ── Tunnel ─────────────────────────────────────────────────────────
+        {'key': 'tunnel_status', 'label': 'Stato tunnel corrente',
+         'type': 'dynamic_info', 'function': 'get_tunnel_status'},
+        {'key': 'avvia_tunnel',  'label': '▶ Avvia Sync (Cloudflare)',
+         'type': 'checkbox', 'default': False},
+        {'key': 'ferma_tunnel',  'label': '⏹ Stop / Reset Tunnel',
+         'type': 'checkbox', 'default': False},
+        {'key': 'kill_zombie',   'label': '🔥 Kill Zombie (termina cloudflared orfani)',
+         'type': 'checkbox', 'default': False},
+        # ── Dashboard ───────────────────────────────────────────────────────
+        {'key': 'dashboard_files', 'label': 'File in attesa di elaborazione',
+         'type': 'dynamic_info', 'function': 'get_dashboard_info'},
+        {'key': 'archivia_tutti', 'label': '📦 Archivia tutti i file dalla coda',
+         'type': 'checkbox', 'default': False},
+        # ── Configurazione ──────────────────────────────────────────────────
+        {'key': 'output_path', 'label': '📁 Cartella Destinazione Archivio',
+         'type': 'text', 'default': r'F:\Cna Pensionati\CNA PENSIONATI 2026\Fatture',
+         'placeholder': r'Es: F:\CNA\Fatture'},
+        # ── Elaborazione immagini ───────────────────────────────────────────
+        {'key': 'auto_crop',        'label': '🔲 Auto-Crop (rilevamento bordi documento)',
+         'type': 'checkbox', 'default': True},
+        {'key': 'white_background', 'label': '⬜ Sfondo Bianco',
+         'type': 'checkbox', 'default': True},
+        {'key': 'brightness',       'label': '☀️ Luminosità (-50 / +50)',
+         'type': 'number',   'default': 35},
+        {'key': 'contrast',         'label': '🌗 Contrasto (0.5 – 2.0)',
+         'type': 'number',   'default': 1.4},
+        {'key': 'clahe_strength',   'label': '📊 CLAHE – contrasto locale (0 = disabilitato)',
+         'type': 'number',   'default': 0.0},
     ],
 }
 
@@ -82,6 +99,9 @@ URL_RE_CF = re.compile(r"https://[a-zA-Z0-9-]+\.trycloudflare\.com", re.I)
 VALID_EXTS = {".pdf", ".jpg", ".jpeg", ".png", ".webp"}
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp"}
 CREATE_NO_WINDOW = 0x08000000 if sys.platform == "win32" else 0
+
+# Stato tunnel persistente a livello di modulo (sopravvive tra le run)
+_tunnel_proc: Optional[subprocess.Popen] = None
 
 # ==============================================================================
 # OPENCV LOCAL INSTALLATION (Lazy Load - NON modifica sys.path all'avvio!)
@@ -523,6 +543,59 @@ def find_cloudflared() -> str:
         return found
     return "cloudflared"  # Fallback: assume sia in PATH
 
+
+# ==============================================================================
+# DYNAMIC INFO FUNCTIONS
+# ==============================================================================
+
+def get_tunnel_status(params: dict) -> str:
+    """Mostra lo stato attuale del tunnel Cloudflare."""
+    global _tunnel_proc
+    is_running = _tunnel_proc is not None and _tunnel_proc.poll() is None
+
+    if is_running:
+        ctx.info("🚀 **Tunnel attivo** — server in esecuzione")
+        if TUNNEL_URL_FILE.exists():
+            try:
+                url = TUNNEL_URL_FILE.read_text("utf-8").strip()
+                if URL_RE_CF.match(url):
+                    ctx.success(
+                        f"✅ **Connessione stabile OK!**\n\n"
+                        f"URL tunnel: `{url}`\n\n"
+                        f"Scansiona il QR Code con il telefono o apri l'URL direttamente."
+                    )
+                    return url
+            except Exception:
+                pass
+        ctx.warning("⏳ In attesa di URL da Cloudflare... (aggiorna tra qualche secondo)")
+    else:
+        ctx.info(
+            "⏹ **Tunnel non attivo.**\n\n"
+            "Spunta *▶ Avvia Sync* e clicca **Esegui** per avviarlo."
+        )
+    return ""
+
+
+def get_dashboard_info(params: dict) -> str:
+    """Mostra i file in attesa di elaborazione nella coda SYNC_BRIDGE."""
+    files = sorted([
+        f for f in SYNC_BRIDGE.glob("*")
+        if f.suffix.lower() in VALID_EXTS and not f.name.startswith("_preview_")
+    ])
+    if not files:
+        ctx.info("📭 Nessun file in coda.")
+        return ""
+    lines = [f"📁 **{len(files)} file in coda** (pronto per archivazione):"]
+    for f in files:
+        try:
+            size_kb = f.stat().st_size // 1024
+            lines.append(f"- `{f.name}` ({size_kb} KB)")
+        except Exception:
+            lines.append(f"- `{f.name}`")
+    ctx.info("\n".join(lines))
+    return str(len(files))
+
+
 # ==============================================================================
 # FASTAPI SERVER
 # ==============================================================================
@@ -827,25 +900,176 @@ if "--server" in sys.argv:
 # ==============================================================================
 # UI LOGIC
 # ==============================================================================
-def run(out_dir, output_path="", **kwargs):
-    """Produce un file di istruzioni (tool interattivo, non eseguibile in batch)."""
-    dest_info = r"F:\Cna Pensionati\CNA PENSIONATI 2026\Fatture" if not output_path else output_path
-    info_file = out_dir / "Istruzioni_Estrattore_Fatture.txt"
+def run(
+    out_dir,
+    output_path="",
+    avvia_tunnel=False,
+    ferma_tunnel=False,
+    kill_zombie=False,
+    archivia_tutti=False,
+    files_manuali=None,
+    auto_crop=True,
+    white_background=True,
+    brightness=35,
+    contrast=1.4,
+    clahe_strength=0.0,
+    **kwargs,
+):
+    """Gestisce tunnel, upload manuale e archiviazione file."""
+    global _tunnel_proc
+    output_files = []
+
+    # ── 1. Tunnel: stop / kill zombie ─────────────────────────────────────────
+    if kill_zombie:
+        kill_cloudflared_processes()
+        kill_port_win(PORT)
+        ctx.success("✅ Processi zombie cloudflared terminati.")
+
+    if ferma_tunnel:
+        if _tunnel_proc is not None:
+            try:
+                _tunnel_proc.terminate()
+            except Exception:
+                pass
+            _tunnel_proc = None
+        kill_cloudflared_processes()
+        kill_port_win(PORT)
+        try:
+            TUNNEL_URL_FILE.unlink(missing_ok=True)
+        except Exception:
+            pass
+        ctx.success("⏹ Tunnel fermato e risorse liberate.")
+
+    # ── 2. Tunnel: avvio ──────────────────────────────────────────────────────
+    if avvia_tunnel and not ferma_tunnel:
+        is_running = _tunnel_proc is not None and _tunnel_proc.poll() is None
+        if not is_running:
+            token = base64.urlsafe_b64encode(os.urandom(12)).decode()
+            env = os.environ.copy()
+            env.update({"UP_TOKEN": token})
+            args = [sys.executable, str(SCRIPT_PATH), "--server", "--port", str(PORT)]
+            _tunnel_proc = subprocess.Popen(args, env=env, creationflags=CREATE_NO_WINDOW)
+            log_event(f"Tunnel server avviato (PID {_tunnel_proc.pid})")
+            ctx.success(
+                f"▶ **Server avviato** (PID {_tunnel_proc.pid}).\n\n"
+                "Aggiorna la pagina tra qualche secondo per vedere l'URL del tunnel."
+            )
+        else:
+            ctx.info("ℹ️ Tunnel già in esecuzione.")
+
+    # ── 3. Salva file caricati manualmente ────────────────────────────────────
+    if files_manuali:
+        if not isinstance(files_manuali, list):
+            files_manuali = [files_manuali]
+        saved = 0
+        for fd in files_manuali:
+            if not isinstance(fd, dict):
+                continue
+            filename = fd.get("filename", "file")
+            content = fd.get("content", b"")
+            ext = Path(filename).suffix.lower()
+            if ext not in VALID_EXTS:
+                ctx.warning(f"⚠️ Estensione non supportata: `{filename}`")
+                continue
+            bn = Path(filename).stem
+            target = SYNC_BRIDGE / filename
+            cnt = 1
+            while target.exists():
+                target = SYNC_BRIDGE / f"{bn}_{cnt}{ext}"
+                cnt += 1
+            target.write_bytes(content)
+            saved += 1
+            ctx.info(f"📥 Salvato in coda: `{target.name}`")
+        if saved:
+            ctx.success(f"✅ {saved} file salvati nella coda di elaborazione.")
+
+    # ── 4. Archivia tutti i file dalla coda ───────────────────────────────────
+    if archivia_tutti:
+        dest_root = Path(output_path) if output_path else Path(
+            r"F:\Cna Pensionati\CNA PENSIONATI 2026\Fatture"
+        )
+        dest_root.mkdir(parents=True, exist_ok=True)
+
+        queue = sorted([
+            f for f in SYNC_BRIDGE.glob("*")
+            if f.suffix.lower() in VALID_EXTS and not f.name.startswith("_preview_")
+        ])
+
+        if not queue:
+            ctx.warning("⚠️ Nessun file in coda da archiviare.")
+        else:
+            archived_count = 0
+            for src in queue:
+                try:
+                    if src.suffix.lower() in IMAGE_EXTS:
+                        # Converti immagine → PDF con effetto scanner
+                        try:
+                            img = Image.open(src)
+                            if img.mode != "RGB":
+                                img = img.convert("RGB")
+                            img = apply_opencv_scanner(
+                                img,
+                                brightness=int(brightness),
+                                contrast=float(contrast),
+                                clahe_strength=float(clahe_strength),
+                                white_background=bool(white_background),
+                                auto_crop=bool(auto_crop),
+                            )
+                            img = apply_scanner_effect(img)
+                            out_pdf = dest_root / (src.stem + ".pdf")
+                            cnt = 1
+                            while out_pdf.exists():
+                                out_pdf = dest_root / f"{src.stem}_{cnt}.pdf"
+                                cnt += 1
+                            img.save(out_pdf, "PDF", resolution=100.0)
+                            src.unlink(missing_ok=True)
+                            ctx.success(f"✅ Archiviato: `{out_pdf.name}`")
+                            output_files.append(out_pdf)
+                        except Exception as e:
+                            ctx.error(f"❌ Errore conversione `{src.name}`: {e}")
+                    else:
+                        # PDF nativo → copia diretta
+                        out_pdf = dest_root / src.name
+                        cnt = 1
+                        while out_pdf.exists():
+                            out_pdf = dest_root / f"{src.stem}_{cnt}{src.suffix}"
+                            cnt += 1
+                        shutil.copy2(src, out_pdf)
+                        src.unlink(missing_ok=True)
+                        ctx.success(f"✅ Archiviato: `{out_pdf.name}`")
+                        output_files.append(out_pdf)
+                    archived_count += 1
+                except Exception as e:
+                    ctx.error(f"❌ Errore archivazione `{src.name}`: {e}")
+
+            if archived_count:
+                ctx.success(f"📦 {archived_count} file archiviati in `{dest_root}`")
+
+    # ── 5. File di riepilogo ──────────────────────────────────────────────────
+    is_running = _tunnel_proc is not None and _tunnel_proc.poll() is None
+    tunnel_url = ""
+    if TUNNEL_URL_FILE.exists():
+        try:
+            tunnel_url = TUNNEL_URL_FILE.read_text("utf-8").strip()
+        except Exception:
+            pass
+    remaining = len([
+        f for f in SYNC_BRIDGE.glob("*")
+        if f.suffix.lower() in VALID_EXTS and not f.name.startswith("_preview_")
+    ])
+
+    info_file = out_dir / "stato_estrattore.txt"
     info_file.write_text(
-        "ESTRATTORE FATTURE (MOBILE) — ISTRUZIONI\n"
-        "=========================================\n\n"
-        "Questo tool funziona come dashboard interattiva con tunnel Cloudflare.\n"
-        "Per l'uso completo avvialo dalla versione Streamlit originale:\n\n"
-        "  python tools/Segreteria/Estrattore-PDF.py\n\n"
-        "Workflow:\n"
-        "  1. Clicca 'Avvia Sync' per creare il tunnel Cloudflare\n"
-        "  2. Scansiona il QR Code con il telefono\n"
-        "  3. Carica foto delle fatture dal cellulare\n"
-        "  4. Elabora e archivia dalla dashboard\n\n"
-        f"Cartella destinazione configurata: {dest_info}\n",
+        "ESTRATTORE FATTURE — STATO CORRENTE\n"
+        "=====================================\n"
+        f"Tunnel: {'ATTIVO' if is_running else 'INATTIVO'}\n"
+        f"URL:    {tunnel_url or 'N/A'}\n"
+        f"File in coda: {remaining}\n"
+        f"Cartella archivio: {output_path or 'non configurata'}\n",
         encoding="utf-8",
     )
-    return [info_file]
+    output_files.append(info_file)
+    return output_files
 
 def check_public_health(url: str) -> bool:
     try:

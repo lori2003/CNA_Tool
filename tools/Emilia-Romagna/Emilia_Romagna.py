@@ -8,7 +8,7 @@ from pathlib import Path
 from collections import Counter
 from typing import Dict, List, Optional, Tuple, Any
 
-import streamlit as st
+from core.toolkit import ctx
 from openpyxl import Workbook, load_workbook
 from openpyxl.utils import get_column_letter
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -2162,8 +2162,8 @@ def _compare_snapshots(old_snap: Dict, new_snap: Dict) -> List[str]:
 
 def _mostra_risultati_validazione(results_data):
     """Mostra i risultati della validazione salvati in session_state"""
-    st.markdown("---")
-    st.subheader("📊 Risultati Validazione vs File Originale")
+    ctx.markdown("---")
+    ctx.subheader("📊 Risultati Validazione vs File Originale")
     
     validation_results = results_data.get("results", [])
     total_diffs = results_data.get("total_diffs", 0)
@@ -2174,23 +2174,23 @@ def _mostra_risultati_validazione(results_data):
     warnings = sum(1 for r in validation_results if r["status"] == "warning")
     
     if total_sheets == 0:
-        st.warning("⚠️ Nessun foglio trovato per il confronto (nomi fogli diversi?).")
+        ctx.warning("⚠️ Nessun foglio trovato per il confronto (nomi fogli diversi?).")
     else:
         # Sommario
         if total_diffs == 0:
-            st.success(f"🏆 **VALIDAZIONE PERFETTA** su {total_sheets} fogli!")
+            ctx.success(f"🏆 **VALIDAZIONE PERFETTA** su {total_sheets} fogli!")
         elif errors == 0 and warnings > 0:
-             st.warning(f"⚠️ **Trovate {total_diffs} differenze** (Probabili correzioni VBA fixato)")
+             ctx.warning(f"⚠️ **Trovate {total_diffs} differenze** (Probabili correzioni VBA fixato)")
         else:
-            st.error(f"❌ Trovate **{total_diffs}** differenze totali ({errors} fogli con errori critici)")
+            ctx.error(f"❌ Trovate **{total_diffs}** differenze totali ({errors} fogli con errori critici)")
         
         # Dettagli
         for result in validation_results:
             if result["status"] == "success":
-                st.success(f"✅ **{result['sheet']}**: MATCH 100% (Dati identici)")
+                ctx.success(f"✅ **{result['sheet']}**: MATCH 100% (Dati identici)")
             elif result["status"] == "warning":
-                st.warning(f"⚠️ **{result['sheet']}**: {result['count']} differenze (Miglioria rispetto al VBA)")
-                with st.expander(f"🔍 Dettagli correzioni - {result['sheet']}", expanded=False):
+                ctx.warning(f"⚠️ **{result['sheet']}**: {result['count']} differenze (Miglioria rispetto al VBA)")
+                with ctx.expander(f"🔍 Dettagli correzioni - {result['sheet']}", expanded=False):
                     msg_info = "Miglioria nota rispetto al VBA."
                     if result['sheet'] == SHEET_GENERE:
                         msg_info = "Correzione Bug VBA: le righe erano scambiate, ora sono corrette."
@@ -2198,20 +2198,20 @@ def _mostra_risultati_validazione(results_data):
                         msg_info = "Correzione Parametri: Python usa soglie aggiornate (2025)."
                     else:
                         msg_info = "Miglioria Tecnica: Sostituite formule Excel con valori statici (M+F) per visibilità immediata."
-                    st.info(msg_info)
+                    ctx.info(msg_info)
                     for i, diff in enumerate(result['details'][:100], 1):
-                        st.text(f"{i}. {diff}")
+                        ctx.text(f"{i}. {diff}")
                     if len(result['details']) > 100:
-                        st.caption(f"... e altre {len(result['details']) - 100} differenze nascoste")
+                        ctx.caption(f"... e altre {len(result['details']) - 100} differenze nascoste")
             else:
-                st.error(f"❌ **{result['sheet']}**: {result['count']} differenze trovate")
-                with st.expander(f"🔍 Dettagli differenze - {result['sheet']}", expanded=False):
+                ctx.error(f"❌ **{result['sheet']}**: {result['count']} differenze trovate")
+                with ctx.expander(f"🔍 Dettagli differenze - {result['sheet']}", expanded=False):
                     for i, diff in enumerate(result['details'][:100], 1):
-                        st.text(f"{i}. {diff}")
+                        ctx.text(f"{i}. {diff}")
                     if len(result['details']) > 100:
-                        st.caption(f"... e altre {len(result['details']) - 100} differenze nascoste")
+                        ctx.caption(f"... e altre {len(result['details']) - 100} differenze nascoste")
     
-    st.markdown("---")
+    ctx.markdown("---")
 
 
 def _genera_html_risultati(validation_results, total_diffs):
@@ -2354,7 +2354,7 @@ def run(file_txt: Optional[Path], file_xlsx: Path, mapping_special: str, out_dir
     # Se False (Default), usiamo 1.0 (calcolo puro).
     effective_coeff = 1.022 if enable_maggiorazione else 1.0
     
-    st.write(f"DEBUG: Parametro compare_vba ricevuto: {compare_vba}")
+    ctx.write(f"DEBUG: Parametro compare_vba ricevuto: {compare_vba}")
     # Gestione eventuale file banca dati (xlsx o slk)
     banca_out: Optional[Path] = None
     if file_banca_dati is not None:
@@ -2373,7 +2373,7 @@ def run(file_txt: Optional[Path], file_xlsx: Path, mapping_special: str, out_dir
     use_banca = banca_out is not None
 
     if compare_vba:
-        st.write("🔍 Debug: Validazione attivata. Inizio analisi...")
+        ctx.write("🔍 Debug: Validazione attivata. Inizio analisi...")
 
     if not file_xlsx_path.exists():
         raise FileNotFoundError(f"File XLSX non trovato: {file_xlsx_path}")
@@ -2383,7 +2383,7 @@ def run(file_txt: Optional[Path], file_xlsx: Path, mapping_special: str, out_dir
     # Parse brackets
     brackets = _parse_brackets(import_brackets)
     if brackets and len(brackets) != 7:
-        st.error(f"Errore: import_brackets deve contenere esattamente 7 valori. Trovati {len(brackets)}. Uso default.")
+        ctx.error(f"Errore: import_brackets deve contenere esattamente 7 valori. Trovati {len(brackets)}. Uso default.")
         brackets = None
     
     if not brackets:
@@ -2414,7 +2414,7 @@ def run(file_txt: Optional[Path], file_xlsx: Path, mapping_special: str, out_dir
     snapshots_old = {}
     if compare_vba:
         try:
-            st.info("🟡 Lettura dati file Input (baseline)...")
+            ctx.info("🟡 Lettura dati file Input (baseline)...")
             wb_old = load_workbook(file_xlsx_path, data_only=False)
             # Case-insensitive exclusion set
             exclude_lower = {n.lower() for n in {SHEET_NAME_DEFAULT, SHEET_LOG}}
@@ -2426,9 +2426,9 @@ def run(file_txt: Optional[Path], file_xlsx: Path, mapping_special: str, out_dir
                 snapshots_old[sname] = _get_sheet_snapshot(wb_old, sname, start_row=template_start_row)
                 found_sheets += 1
             wb_old.close()
-            st.write(f"🔍 Debug: Letti {found_sheets} fogli dal file di input per confronto.")
+            ctx.write(f"🔍 Debug: Letti {found_sheets} fogli dal file di input per confronto.")
         except Exception as e:
-            st.error(f"❌ Errore critico lettura file input: {e}")
+            ctx.error(f"❌ Errore critico lettura file input: {e}")
             compare_vba = False 
 
     # ================= MAPPING & LOGIC (V2) =================
@@ -2629,14 +2629,14 @@ def run(file_txt: Optional[Path], file_xlsx: Path, mapping_special: str, out_dir
                 "results": validation_results,
                 "total_diffs": total_diffs
             }
-            st.session_state[validation_key] = final_data
+            ctx.session_state[validation_key] = final_data
             
             # Visualizzazione
             _mostra_risultati_validazione(final_data)
             
         except Exception as e:
-            st.error(f"❌ **Errore durante confronto finale:** {e}")
-            st.session_state[validation_key] = {
+            ctx.error(f"❌ **Errore durante confronto finale:** {e}")
+            ctx.session_state[validation_key] = {
                 "results": [],
                 "total_diffs": 0,
                 "error": str(e)

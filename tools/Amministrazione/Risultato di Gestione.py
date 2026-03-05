@@ -6,7 +6,7 @@ from datetime import date
 from pathlib import Path
 from typing import Dict, List, Any
 
-import streamlit as st
+from core.toolkit import ctx
 from openpyxl import load_workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 
@@ -170,13 +170,13 @@ def get_template_status(values: Dict[str, Any]) -> str:
                 break
 
     if not template_val:
-        st.error("❌ Nessun template configurato.")
+        ctx.error("❌ Nessun template configurato.")
         return ""
 
     if Path(template_val).exists():
         return "✅ **Template trovato**"
     else:
-        st.error(f"❌ Template non trovato: `{template_val}`")
+        ctx.error(f"❌ Template non trovato: `{template_val}`")
         return ""
 
 
@@ -261,7 +261,7 @@ def run(
         g['indices'].append(idx)
         g['raw'].append((val_a, val_o, val_ao, val_ab))
 
-    st.info(
+    ctx.info(
         f"**📂 File 1 — Effettivo Dopo Totale**  \n"
         f"Righe catturate: **{len(data_f1)}** — "
         f"raggruppate in **{len(j_groups)}** voci canoniche"
@@ -286,9 +286,9 @@ def run(
 
     wb2.close()
 
-    with st.expander(f"🔍 Dati letti dal Tabulato Sindrinn — {len(data_f2)} righe"):
+    with ctx.expander(f"🔍 Dati letti dal Tabulato Sindrinn — {len(data_f2)} righe"):
         for nome, valore in data_f2:
-            st.write(f"• {nome}  →  {valore}")
+            ctx.write(f"• {nome}  →  {valore}")
 
     # ── 4b. Raggruppamento File 2: somma val P per nome canonico ─────────────
     h_groups: Dict[str, Any] = {}
@@ -308,7 +308,7 @@ def run(
         g['indices'].append(idx)
         g['raw'].append((val_b, val_p))
 
-    st.info(
+    ctx.info(
         f"**📂 File 2 — Tabulato Sindrinn**  \n"
         f"Righe catturate: **{len(data_f2)}** — "
         f"raggruppate in **{len(h_groups)}** voci canoniche"
@@ -499,28 +499,28 @@ def run(
     wb.close()
 
     # ── 8. Feedback all'utente ────────────────────────────────────────────────
-    st.success(f"✅ File generato: **{out_path.name}**")
-    st.markdown("---")
-    st.markdown("### 📊 Riepilogo confronto")
+    ctx.success(f"✅ File generato: **{out_path.name}**")
+    ctx.markdown("---")
+    ctx.markdown("### 📊 Riepilogo confronto")
 
-    c1, c2 = st.columns(2)
+    c1, c2 = ctx.columns(2)
     with c1:
-        st.markdown("**Gruppo H:I — Sindrinn**")
-        st.write(f"• ✅ Abbinati (I → B, verde): **{matched_hi}**")
-        st.write(f"• ❌ Col A senza match Sindrinn (rosso): **{unmatched_hi}**")
+        ctx.markdown("**Gruppo H:I — Sindrinn**")
+        ctx.write(f"• ✅ Abbinati (I → B, verde): **{matched_hi}**")
+        ctx.write(f"• ❌ Col A senza match Sindrinn (rosso): **{unmatched_hi}**")
         n_h_fondo = len(data_f2) - len(used_f2_indices)
-        st.write(f"• ⬇️ Scritte in fondo (non abbinate): **{n_h_fondo}**")
+        ctx.write(f"• ⬇️ Scritte in fondo (non abbinate): **{n_h_fondo}**")
     with c2:
-        st.markdown("**Gruppo J:M — Effettivo**")
-        st.write(f"• ✅ Abbinati (K→C, L→D, M→E, verde): **{matched_jm}**")
-        st.write(f"• ❌ Col A senza match Effettivo (rosso): **{unmatched_jm}**")
+        ctx.markdown("**Gruppo J:M — Effettivo**")
+        ctx.write(f"• ✅ Abbinati (K→C, L→D, M→E, verde): **{matched_jm}**")
+        ctx.write(f"• ❌ Col A senza match Effettivo (rosso): **{unmatched_jm}**")
         n_j_fondo = len(data_f1) - len(used_f1_indices)
-        st.write(f"• ⬇️ Scritte in fondo (non abbinate): **{n_j_fondo}**")
+        ctx.write(f"• ⬇️ Scritte in fondo (non abbinate): **{n_j_fondo}**")
 
     if unmatched_h_names:
-        with st.expander(f"⬇️ Voci Sindrinn non abbinate — scritte in fondo ({len(unmatched_h_names)})"):
+        with ctx.expander(f"⬇️ Voci Sindrinn non abbinate — scritte in fondo ({len(unmatched_h_names)})"):
             for name in unmatched_h_names:
-                st.write(f"• {name}")
+                ctx.write(f"• {name}")
 
     return [out_path]
 

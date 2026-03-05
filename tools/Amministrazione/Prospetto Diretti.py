@@ -1,4 +1,5 @@
-import streamlit as st
+import functools
+from core.toolkit import ctx
 import pandas as pd
 import os
 import datetime
@@ -61,28 +62,28 @@ def get_template_header_preview(values):
         wb.close()
 
         # UI Editabile
-        st.info("ℹ️ L'anno verrà aggiornato automaticamente durante l'esecuzione (Anno Corrente - 1).")
-        new_header = st.text_input("Intestazione Report (Base)", value=current_header, key="custom_header_edit")
+        ctx.info("ℹ️ L'anno verrà aggiornato automaticamente durante l'esecuzione (Anno Corrente - 1).")
+        new_header = ctx.text_input("Intestazione Report (Base)", value=current_header, key="custom_header_edit")
 
-        if st.button("💾 Salva Intestazione nel Template", key="save_header_btn"):
+        if ctx.button("💾 Salva Intestazione nel Template", key="save_header_btn"):
             try:
                 wb_write = load_workbook(template_path)
                 ws_write = wb_write.active
                 ws_write['A1'] = new_header
                 wb_write.save(template_path)
                 wb_write.close()
-                st.success(f"✅ Intestazione aggiornata: **{new_header}**")
+                ctx.success(f"✅ Intestazione aggiornata: **{new_header}**")
                 # Ricarica per sicurezza visuale
-                st.rerun()
+                ctx.rerun()
             except Exception as e:
-                st.error(f"Errore salvataggio: {e}")
+                ctx.error(f"Errore salvataggio: {e}")
 
         return "" # La UI è renderizzata direttamente
 
     except Exception as e:
         return f"Errore lettura header: {e}"
 
-@st.cache_data(show_spinner="Elaborazione in corso...")
+@functools.lru_cache(maxsize=32)
 def process_excel_data(file_content, report_year):
     """Elabora i dati e ritorna il dataframe processato e le metriche."""
     try:
@@ -203,10 +204,10 @@ def process_excel_data(file_content, report_year):
         return None, str(e), {}
 
 def get_ui_results():
-    if "prospetto_diretti_dashboard_data" not in st.session_state:
+    if "prospetto_diretti_dashboard_data" not in ctx.session_state:
         return
         
-    val_data = st.session_state["prospetto_diretti_dashboard_data"]
+    val_data = ctx.session_state["prospetto_diretti_dashboard_data"]
     metrics = val_data.get("metrics", {})
     grouped = val_data.get("grouped")
     
@@ -217,7 +218,7 @@ def get_ui_results():
     current_year = datetime.datetime.now().year
     report_year = current_year - 1
     
-    st.write(f"### 🗓️ Generazione Prospetto Diretti: **{report_year}**")
+    ctx.write(f"### 🗓️ Generazione Prospetto Diretti: **{report_year}**")
 
     # Estrai metriche
     total_rows_input = metrics.get('total_rows_input', 0)
@@ -230,43 +231,43 @@ def get_ui_results():
 
     # 📊 DASHBOARD DI CONTROLLO UNIFICATA
     # Header rimosso su richiesta utente (ridondante)
-    # st.markdown("### 📊 Dashboard di Controllo Elaborazione")
-    st.markdown("---")
+    # ctx.markdown("### 📊 Dashboard di Controllo Elaborazione")
+    ctx.markdown("---")
     
     # Riga 1: Metriche Input
-    c1, c2, c3 = st.columns(3)
+    c1, c2, c3 = ctx.columns(3)
     c1.metric("Record Totali Input", total_rows_input)
     c2.metric("Record Validi", valid_rows_count)
     c3.metric("Record Scartati (No Sede)", dropped_rows_count, delta_color="inverse")
     
     if dropped_rows_count > 0:
-        st.warning(f"⚠️ Attenzione: sono stati scartati **{dropped_rows_count}** record perché privi di Codice Sede.")
+        ctx.warning(f"⚠️ Attenzione: sono stati scartati **{dropped_rows_count}** record perché privi di Codice Sede.")
 
     # Riga 2: Metriche Calcolate
-    st.markdown("#### ✅ Verifica Totali Calcolati")
-    c1_calc, c2_calc = st.columns(2)
+    ctx.markdown("#### ✅ Verifica Totali Calcolati")
+    c1_calc, c2_calc = ctx.columns(2)
     c1_calc.metric("Totale Associati Calcolato", calc_total_associati)
     c2_calc.metric("Totale Importo Calcolato", f"€ {calc_total_importo:,.2f}")
     
-    st.markdown("---")
+    ctx.markdown("---")
     
     # Tabelle di Riepilogo
-    col_reg, col_prov = st.columns(2)
+    col_reg, col_prov = ctx.columns(2)
     
     with col_reg:
-        st.markdown("##### 📍 Riepilogo per Regione")
+        ctx.markdown("##### 📍 Riepilogo per Regione")
         grouped_region = grouped.groupby('Regione')[['Associati', 'Importo']].sum().reset_index()
-        st.dataframe(grouped_region, use_container_width=True, hide_index=True)
+        ctx.dataframe(grouped_region, use_container_width=True, hide_index=True)
         
     with col_prov:
-        st.markdown("##### 🏢 Riepilogo per Provincia (Sede)")
-        st.dataframe(grouped, use_container_width=True, hide_index=True)
+        ctx.markdown("##### 🏢 Riepilogo per Provincia (Sede)")
+        ctx.dataframe(grouped, use_container_width=True, hide_index=True)
 
-    st.markdown("---")
+    ctx.markdown("---")
 
 def run(file_input, **kwargs):
     if not file_input:
-        st.warning("Per favore carica un file Excel.")
+        ctx.warning("Per favore carica un file Excel.")
         return []
 
     try:
@@ -277,14 +278,14 @@ def run(file_input, **kwargs):
         grouped, error_msg, metrics = process_excel_data(file_input, report_year) # report_year impacting nothing but cache key differentiation
         
         if error_msg:
-            st.error(f"Errore: {error_msg}")
+            ctx.error(f"Errore: {error_msg}")
             return []
             
         if grouped is None:
              return []
 
         # Salvataggio Dati in Session State per la Dashboard Persistente
-        st.session_state["prospetto_diretti_dashboard_data"] = {
+        ctx.session_state["prospetto_diretti_dashboard_data"] = {
             "metrics": metrics,
             "grouped": grouped
         }
@@ -295,7 +296,7 @@ def run(file_input, **kwargs):
         # 6. Scrittura su Template
         template_path = os.path.join("tools", "Amministrazione", "FileProspetti_Formattati", "Template-Diretti", "Template-Diretti.xlsx")
         if not os.path.exists(template_path):
-            st.error(f"❌ Template non trovato: `{template_path}`")
+            ctx.error(f"❌ Template non trovato: `{template_path}`")
             return []
 
         wb = load_workbook(template_path)
@@ -316,7 +317,7 @@ def run(file_input, **kwargs):
         alignment_right = Alignment(horizontal='right')
 
         regions = grouped['Regione'].unique()
-        progress_bar = st.progress(0)
+        progress_bar = ctx.progress(0)
         total_regions = len(regions)
         
         # Liste per tracciare le celle dei Totali Regionali per il Grand Total
@@ -495,13 +496,13 @@ def run(file_input, **kwargs):
         wb.save(output_path)
         progress_bar.empty()
 
-        st.success(f"✅ Prospetto generato con successo!")
+        ctx.success(f"✅ Prospetto generato con successo!")
             
         return [output_path]
 
     except Exception as e:
-        st.error(f"Errore critico durante l'elaborazione: {e}")
-        st.exception(e)
+        ctx.error(f"Errore critico durante l'elaborazione: {e}")
+        ctx.exception(e)
         return []
 
 

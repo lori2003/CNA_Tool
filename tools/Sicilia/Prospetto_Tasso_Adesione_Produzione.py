@@ -11,7 +11,7 @@ import unicodedata
 import difflib
 import re # Risk 6: Regex validation
 
-import streamlit as st
+from core.toolkit import ctx
 
 # Safe imports
 try:
@@ -286,9 +286,9 @@ def preview_files(params: Dict[str, Any]) -> str:
 
     expected_key_suffix = "_prospetto_tasso_adesione_produzione_files"
 
-    for k in st.session_state.keys():
+    for k in ctx.session_state.keys():
         if str(k).endswith(expected_key_suffix) and k.startswith("up_"):
-            files = st.session_state[k]
+            files = ctx.session_state[k]
             break
 
     if not files:
@@ -312,11 +312,11 @@ def preview_files(params: Dict[str, Any]) -> str:
         })
 
     if data:
-        st.dataframe(pd.DataFrame(data), use_container_width=True)
+        ctx.dataframe(pd.DataFrame(data), use_container_width=True)
 
         unknown_count = sum(1 for d in data if d["Tipo Riconosciuto"] == "SCONOSCIUTO")
         if unknown_count > 0:
-            st.warning(f"⚠️ Ci sono {unknown_count} file non riconosciuti che verranno ignorati.")
+            ctx.warning(f"⚠️ Ci sono {unknown_count} file non riconosciuti che verranno ignorati.")
 
     return ""
 
@@ -329,27 +329,27 @@ def manage_template(params: Dict[str, Any]) -> str:
     base_path = Path(__file__).resolve().parent
     template_path = base_path / "Tabelle - Template" / "Template" / "Sicilia_Prospetto_Variazioni.xlsx"
     
-    st.markdown("##### 📝 Configurazione Template Excel")
+    ctx.markdown("##### 📝 Configurazione Template Excel")
     
     # UI: Path + buttons
-    col_path, col_btn1, col_btn2 = st.columns([0.85, 0.075, 0.075])
+    col_path, col_btn1, col_btn2 = ctx.columns([0.85, 0.075, 0.075])
     with col_path:
-        st.text_input("Percorso Template", value=str(template_path), disabled=True, label_visibility="collapsed")
+        ctx.text_input("Percorso Template", value=str(template_path), disabled=True, label_visibility="collapsed")
     with col_btn1:
-        if st.button("📂", help="Apri cartella template"):
+        if ctx.button("📂", help="Apri cartella template"):
             try:
                 os.startfile(template_path.parent)
             except Exception as e:
-                st.error(f"Errore: {e}")
+                ctx.error(f"Errore: {e}")
     with col_btn2:
-        if st.button("🔎", help="Apri file template"):
+        if ctx.button("🔎", help="Apri file template"):
             try:
                 os.startfile(template_path)
             except Exception as e:
-                st.error(f"Errore: {e}")
+                ctx.error(f"Errore: {e}")
 
     if not template_path.exists():
-        st.error("❌ File template non trovato!")
+        ctx.error("❌ File template non trovato!")
         return ""
     
     # ── Auto-date calculation ────────────────────────────────────────────
@@ -388,45 +388,45 @@ def manage_template(params: Dict[str, Any]) -> str:
         val_e1_str = str(val_e1).strip() if val_e1 is not None else ""
         
         # ── Show auto-calculated values ──────────────────────────────────
-        st.markdown("#### 📅 Valori Automatici (Anno Precedente)")
-        st.caption(f"Anno di riferimento: **{prev_year}**")
+        ctx.markdown("#### 📅 Valori Automatici (Anno Precedente)")
+        ctx.caption(f"Anno di riferimento: **{prev_year}**")
         
-        col1, col2 = st.columns(2)
+        col1, col2 = ctx.columns(2)
         with col1:
-            st.info(f"**C3 auto:** `{auto_c3}`")
-            st.caption(f"Attuale: `{val_c3_str}`")
+            ctx.info(f"**C3 auto:** `{auto_c3}`")
+            ctx.caption(f"Attuale: `{val_c3_str}`")
         with col2:
-            st.info(f"**E1 auto:** `{auto_e1}`")
-            st.caption(f"Attuale: `{val_e1_str}`")
+            ctx.info(f"**E1 auto:** `{auto_e1}`")
+            ctx.caption(f"Attuale: `{val_e1_str}`")
         
         # Check if update is needed
         needs_update = (val_c3_str != auto_c3 or val_e1_str != auto_e1)
         
         if needs_update:
-            st.warning("⚠️ I valori nel template non corrispondono all'anno corrente - 1.")
+            ctx.warning("⚠️ I valori nel template non corrispondono all'anno corrente - 1.")
         else:
-            st.success("✅ Il template è già aggiornato.")
+            ctx.success("✅ Il template è già aggiornato.")
         
         # ── Auto-update button ───────────────────────────────────────────
-        if st.button("🔄 Aggiorna Automaticamente", type="primary", disabled=not needs_update):
+        if ctx.button("🔄 Aggiorna Automaticamente", type="primary", disabled=not needs_update):
             try:
                 wb = load_workbook(template_path)
                 ws = wb.active
                 ws['C3'] = auto_c3
                 ws['E1'] = auto_e1
                 wb.save(template_path)
-                st.success(f"✅ Template aggiornato: C3=`{auto_c3}`, E1=`{auto_e1}`")
+                ctx.success(f"✅ Template aggiornato: C3=`{auto_c3}`, E1=`{auto_e1}`")
                 time.sleep(1)
-                st.rerun()
+                ctx.rerun()
             except Exception as e:
-                st.error(f"❌ Errore: {e}")
+                ctx.error(f"❌ Errore: {e}")
         
         # ── Manual override (collapsed) ──────────────────────────────────
-        with st.expander("✏️ Modifica Manuale (override)"):
-            new_c3 = st.text_input("Cella C3 (Data Riferimento)", value=val_c3_str)
-            new_e1 = st.text_input("Cella E1 (Periodo Variazioni)", value=val_e1_str)
+        with ctx.expander("✏️ Modifica Manuale (override)"):
+            new_c3 = ctx.text_input("Cella C3 (Data Riferimento)", value=val_c3_str)
+            new_e1 = ctx.text_input("Cella E1 (Periodo Variazioni)", value=val_e1_str)
             
-            if st.button("💾 Salva Modifiche Manuali"):
+            if ctx.button("💾 Salva Modifiche Manuali"):
                 if new_c3 != val_c3_str or new_e1 != val_e1_str:
                     try:
                         wb = load_workbook(template_path)
@@ -434,72 +434,72 @@ def manage_template(params: Dict[str, Any]) -> str:
                         ws['C3'] = new_c3
                         ws['E1'] = new_e1
                         wb.save(template_path)
-                        st.success("✅ Template aggiornato!")
+                        ctx.success("✅ Template aggiornato!")
                         time.sleep(1)
-                        st.rerun()
+                        ctx.rerun()
                     except Exception as e:
-                        st.error(f"❌ Errore: {e}")
+                        ctx.error(f"❌ Errore: {e}")
                 else:
-                    st.info("ℹ️ Nessuna modifica rilevata.")
+                    ctx.info("ℹ️ Nessuna modifica rilevata.")
                     
     except Exception as e:
-        st.error(f"Errore nella lettura del template: {e}")
+        ctx.error(f"Errore nella lettura del template: {e}")
         
     return ""
 
 
 def handle_clear_cache(params: Dict[str, Any]) -> str:
     """Displays a button to clear the geocoding cache."""
-    st.warning(
+    ctx.warning(
         "⚠️ **PROMEMORIA:** Svuota la cache solo se hai modificato la logica API o se vuoi "
         "forzare una nuova geocodifica per tutti i comuni. La cache velocizza notevolmente "
         "l'elaborazione riutilizzando i risultati precedenti."
     )
     
-    if st.button("🗑️ Svuota Cache API", type="secondary", use_container_width=True):
+    if ctx.button("🗑️ Svuota Cache API", type="secondary", use_container_width=True):
         if _CACHE_FILE.exists():
             try:
                 _CACHE_FILE.unlink()
-                st.success("✅ Cache geocoding svuotata con successo! Alla prossima esecuzione tutti i comuni verranno richiesti nuovamente all'API.")
+                ctx.success("✅ Cache geocoding svuotata con successo! Alla prossima esecuzione tutti i comuni verranno richiesti nuovamente all'API.")
             except Exception as e:
-                st.error(f"❌ Errore durante la cancellazione della cache: {e}")
+                ctx.error(f"❌ Errore durante la cancellazione della cache: {e}")
         else:
-            st.info("ℹ️ La cache è già vuota (nessun file trovato).")
+            ctx.info("ℹ️ La cache è già vuota (nessun file trovato).")
     
     # Show current cache status
     if _CACHE_FILE.exists():
         cache_size = _CACHE_FILE.stat().st_size
-        st.caption(f"📊 Cache esistente: {cache_size:,} bytes")
+        ctx.caption(f"📊 Cache esistente: {cache_size:,} bytes")
     else:
-        st.caption("📊 Nessuna cache presente")
+        ctx.caption("📊 Nessuna cache presente")
     
     return ""
 
 
 def manage_corrections(params: Dict[str, Any]) -> str:
     """Displays UI for managing custom name corrections."""
-    st.info("📝 **Correzioni personalizzate** per nomi comuni problematici rilevati dall'API.")
+    ctx.info("📝 **Correzioni personalizzate** per nomi comuni problematici rilevati dall'API.")
     
     # Load current corrections
     corrections = _load_corrections()
     
     # Display current corrections in an editable way
-    st.markdown("#### Correzioni Attive")
+    ctx.markdown("#### Correzioni Attive")
     
     # Convert dict to text for editing
     corrections_text = "\n".join([f"{k} → {v}" for k, v in corrections.items()])
     
-    edited_text = st.text_area(
+    edited_text = ctx.text_area(
         "Formato: NOME_ERRATO → Nome Corretto (uno per riga)",
         value=corrections_text,
         height=200,
         help="Inserisci le correzioni nel formato: NOME_SBAGLIATO → Nome Corretto. Attenzione alle maiuscole/minuscole per il nome corretto!"
     )
     
-    col1, col2 = st.columns(2)
+    col1, col2 = ctx.columns(2)
     
     with col1:
-        if st.button("💾 Salva Correzioni", use_container_width=True):
+        if ctx.button("💾 Salva Correzioni", use_container_width=True):
             # Parse text back to dict
             new_corrections = {}
             for line in edited_text.strip().split('\n'):
@@ -511,16 +511,16 @@ def manage_corrections(params: Dict[str, Any]) -> str:
                         new_corrections[wrong.upper()] = correct
            
             _save_corrections(new_corrections)
-            st.success(f"✅ Salvate {len(new_corrections)} correzioni!")
-            st.rerun()
+            ctx.success(f"✅ Salvate {len(new_corrections)} correzioni!")
+            ctx.rerun()
     
     with col2:
-        if st.button("🔄 Ripristina Predefinite", use_container_width=True):
+        if ctx.button("🔄 Ripristina Predefinite", use_container_width=True):
             _save_corrections(_DEFAULT_CORRECTIONS.copy())
-            st.success("✅ Correzioni ripristinate ai valori predefiniti!")
-            st.rerun()
+            ctx.success("✅ Correzioni ripristinate ai valori predefiniti!")
+            ctx.rerun()
     
-    st.caption(f"📊 Correzioni attive: **{len(corrections)}**")
+    ctx.caption(f"📊 Correzioni attive: **{len(corrections)}**")
     
     return ""
 
@@ -746,7 +746,7 @@ def process_line(line: str, file_type: str, lookup: Dict[str, Any],
 
 def _render_dashboard() -> None:
     """Display the summary dashboard from session_state. Persists across reruns."""
-    data = st.session_state.get('prospetto_sicilia_dashboard')
+    data = ctx.session_state.get('prospetto_sicilia_dashboard')
     if not data:
         return
 
@@ -763,30 +763,30 @@ def _render_dashboard() -> None:
     total_rinnovi = data.get('total_rinnovi', 0)
     final_file = data.get('final_file')
 
-    st.markdown("---")
-    st.markdown("## 📊 Dashboard Riepilogativa (Sicilia)")
+    ctx.markdown("---")
+    ctx.markdown("## 📊 Dashboard Riepilogativa (Sicilia)")
 
     # ── Summary Metrics ────────────────────────────────────────────────
-    col1, col2 = st.columns(2)
+    col1, col2 = ctx.columns(2)
     with col1:
-        st.info(f"📋 **Totale Record Sicilia:** {total:,}")
-        st.write(f"- 🔍 Da Codice Catastale: **{count_ok:,}**")
-        st.write(f"- 🌐 Recuperati via API: **{count_api:,}**")
-        st.write(f"- ❓ Assegnati a 'ALTRI': **{count_altri_total:,}**")
+        ctx.info(f"📋 **Totale Record Sicilia:** {total:,}")
+        ctx.write(f"- 🔍 Da Codice Catastale: **{count_ok:,}**")
+        ctx.write(f"- 🌐 Recuperati via API: **{count_api:,}**")
+        ctx.write(f"- ❓ Assegnati a 'ALTRI': **{count_altri_total:,}**")
     
     with col2:
-        st.success(f"📈 **Dettaglio Elaborazione Variazioni**")
-        st.write(f"- 🔄 **RINNOVO** (SINDRINN): **{total_rinnovi:,}**")
-        st.write(f"- 📍 **0 - CONCOMITANTI**: **{sindmens_counts.get('0', 0):,}**")
-        st.write(f"- 📝 **2 - DELEGHE**: **{sindmens_counts.get('2', 0):,}**")
-        st.write(f"- ❌ **1 - REVOCHE**: **{sindmens_counts.get('1', 0):,}**")
-        st.write(f"- 🗑️ **3 - ELIMINATE**: **{sindmens_counts.get('3', 0):,}**")
+        ctx.success(f"📈 **Dettaglio Elaborazione Variazioni**")
+        ctx.write(f"- 🔄 **RINNOVO** (SINDRINN): **{total_rinnovi:,}**")
+        ctx.write(f"- 📍 **0 - CONCOMITANTI**: **{sindmens_counts.get('0', 0):,}**")
+        ctx.write(f"- 📝 **2 - DELEGHE**: **{sindmens_counts.get('2', 0):,}**")
+        ctx.write(f"- ❌ **1 - REVOCHE**: **{sindmens_counts.get('1', 0):,}**")
+        ctx.write(f"- 🗑️ **3 - ELIMINATE**: **{sindmens_counts.get('3', 0):,}**")
 
     # ── Download persistence ──────────────────────────────────────────
     if final_file:
-        st.markdown("### 📥 File Disponibile per il Download")
+        ctx.markdown("### 📥 File Disponibile per il Download")
         with open(final_file, "rb") as f:
-            st.download_button(
+            ctx.download_button(
                 label="📥 Scarica Prospetto Variazioni Compilato",
                 data=f,
                 file_name=os.path.basename(final_file),
@@ -795,7 +795,7 @@ def _render_dashboard() -> None:
 
     # ── Detail of ALTRI breakdown ────────────────────────────────────────
     if count_altri_total > 0:
-        st.warning(
+        ctx.warning(
             f"⚠️ **{count_altri_total}** record assegnati a **'ALTRI'** — dettaglio:\n"
             f"- 📭 **{count_empty}** con campi indirizzo/comune/cap **vuoti** nel file "
             f"(impossibile chiamare API)\n"
@@ -804,8 +804,8 @@ def _render_dashboard() -> None:
         )
 
     # ── API Results table (full width) ─────────────────────────────────
-    st.markdown("### 🌐 Comuni Recuperati via API")
-    st.caption("✅ = identico · ⚠️ = nome diverso (preferito file o API ha trovato comune diverso)")
+    ctx.markdown("### 🌐 Comuni Recuperati via API")
+    ctx.caption("✅ = identico · ⚠️ = nome diverso (preferito file o API ha trovato comune diverso)")
     if api_results:
         # Define columns we want to display
         display_cols = [
@@ -820,9 +820,9 @@ def _render_dashboard() -> None:
             '📄 Dal File: Indirizzo', '🌐 API: Risultato', '✏️ → Output',
             '📌 Fonte Usata', '🔍 Query API'
         ]
-        st.dataframe(df_api, use_container_width=True, hide_index=True, height=400)
+        ctx.dataframe(df_api, use_container_width=True, hide_index=True, height=400)
     else:
-        st.info("Nessun comune recuperato via API.")
+        ctx.info("Nessun comune recuperato via API.")
 
 
 
@@ -868,15 +868,15 @@ def run(out_dir: Path, files: List[Any] = [], **kwargs) -> List[Path]:
     lookup_error = None
     if not lookup_path.exists():
         lookup_error = f"File lookup non trovato: {lookup_path}"
-        st.error(f"⚠️ {lookup_error}")
+        ctx.error(f"⚠️ {lookup_error}")
     else:
         lookup_dict, valid_names, name_to_info = load_lookup_data(lookup_path)
-        st.info(f"📖 Caricati **{len(lookup_dict)}** codici comune dal file di riferimento.")
+        ctx.info(f"📖 Caricati **{len(lookup_dict)}** codici comune dal file di riferimento.")
 
     # ── 2. Check API key ─────────────────────────────────────────────────
     has_api = bool(LOCATIONIQ_API_KEY)
     if not has_api:
-        st.warning("⚠️ Chiave API LocationIQ non trovata. "
+        ctx.warning("⚠️ Chiave API LocationIQ non trovata. "
                     "I record senza codice saranno assegnati a 'ALTRI'.")
 
     # Init dashboard counters
@@ -902,7 +902,7 @@ def run(out_dir: Path, files: List[Any] = [], **kwargs) -> List[Path]:
     # ══════════════════════════════════════════════════════════════════════
     #  FASE 1: Parse all files (local lookup only)
     # ══════════════════════════════════════════════════════════════════════
-    st.info("📝 **Fase 1:** Parsing file e lookup locale codici catastali...")
+    ctx.info("📝 **Fase 1:** Parsing file e lookup locale codici catastali...")
 
     for file_obj in files:
         filename = "unknown.txt"
@@ -977,16 +977,16 @@ def run(out_dir: Path, files: List[Any] = [], **kwargs) -> List[Path]:
     # Risk 1: Show warning for scarti
     if scarti_stats:
         tot_scarti = sum(scarti_stats.values())
-        st.warning(f"⚠️ **ATTENZIONE:** {tot_scarti} record scartati per Sede non in Whitelist.")
+        ctx.warning(f"⚠️ **ATTENZIONE:** {tot_scarti} record scartati per Sede non in Whitelist.")
         # Top 10 scarti
         df_scarti = pd.DataFrame(list(scarti_stats.items()), columns=['Codice Sede', 'Record Scartati'])
         df_scarti = df_scarti.sort_values('Record Scartati', ascending=False).head(10)
-        st.dataframe(df_scarti, use_container_width=True, height=150)
+        ctx.dataframe(df_scarti, use_container_width=True, height=150)
         
         top_sede = df_scarti.iloc[0]['Codice Sede']
-        st.info(f"💡 Se il codice **{top_sede}** è una sede valida, aggiungilo alla Whitelist nelle opzioni.")
+        ctx.info(f"💡 Se il codice **{top_sede}** è una sede valida, aggiungilo alla Whitelist nelle opzioni.")
 
-    st.info(
+    ctx.info(
         f"📊 **Fase 1 completata:** {total_accepted:,} record accettati (Sicilia)\n"
         f"- ✅ **{len(ok_results):,}** trovati da codice catastale\n"
         f"- 🌐 **{len(need_api_results):,}** da risolvere via API "
@@ -1018,16 +1018,16 @@ def run(out_dir: Path, files: List[Any] = [], **kwargs) -> List[Path]:
         n_unique = len(unique_cities)
         n_api_rows = len(need_api_results)
 
-        st.info(
+        ctx.info(
             f"🌐 **Fase 2:** Geocoding per **{n_api_rows:,}** record → "
             f"solo **{n_unique}** comuni unici da risolvere.\n\n"
             f"⏱️ Tempo stimato: **~{n_unique}** secondi "
             f"({n_api_rows - n_unique:,} duplicati saltati)"
         )
 
-        progress_bar = st.progress(0, text="Geocoding comuni unici...")
-        progress_text = st.empty()
-        status_text = st.empty()
+        progress_bar = ctx.progress(0, text="Geocoding comuni unici...")
+        progress_text = ctx.empty()
+        status_text = ctx.empty()
         start_time = time.time()
 
         for i, ckey in enumerate(unique_cities):
@@ -1167,7 +1167,7 @@ def run(out_dir: Path, files: List[Any] = [], **kwargs) -> List[Path]:
             if api_recovery_map[ck] == "ALTRI"
         )
 
-        st.success(
+        ctx.success(
             f"🌐 Geocoding completato in **{tot_m} min {tot_s} sec**:\n"
             f"- 🔍 **{n_unique}** comuni unici analizzati "
             f"(su {n_api_rows:,} record)\n"
@@ -1180,9 +1180,9 @@ def run(out_dir: Path, files: List[Any] = [], **kwargs) -> List[Path]:
         for r in need_api_results:
             ckey = r['city'].upper() if r['city'] else ""
             api_recovery_map[ckey] = "ALTRI"
-        st.warning(f"⚠️ Chiave API mancante: {len(need_api_results):,} record → ALTRI")
+        ctx.warning(f"⚠️ Chiave API mancante: {len(need_api_results):,} record → ALTRI")
     else:
-        st.success("✅ Nessun record da geocodificare via API.")
+        ctx.success("✅ Nessun record da geocodificare via API.")
 
     # Save cache
     _save_cache(geocode_cache)
@@ -1190,7 +1190,7 @@ def run(out_dir: Path, files: List[Any] = [], **kwargs) -> List[Path]:
     # ══════════════════════════════════════════════════════════════════════
     #  FASE 3: Assemble output files
     # ══════════════════════════════════════════════════════════════════════
-    st.info("📄 **Fase 3:** Assemblaggio file di output...")
+    ctx.info("📄 **Fase 3:** Assemblaggio file di output...")
 
     sindrinn_lines = {}
     report_rows = []
@@ -1306,13 +1306,13 @@ def run(out_dir: Path, files: List[Any] = [], **kwargs) -> List[Path]:
                 global_sindmens[cfun] += 1
 
     # ── TEMPLATE POPULATION (Sicilia_Prospetto_Variazioni) ───────────────────
-    st.info("📊 **Fase 4:** Popolamento template variazioni...")
+    ctx.info("📊 **Fase 4:** Popolamento template variazioni...")
     
     template_in = base_path / "Tabelle - Template" / "Template" / "Sicilia_Prospetto_Variazioni.xlsx"
     if not template_in.exists():
-        st.error(f"❌ Template non trovato: {template_in}")
+        ctx.error(f"❌ Template non trovato: {template_in}")
         # Update dashboard even if template fails
-        st.session_state['prospetto_sicilia_dashboard'] = {
+        ctx.session_state['prospetto_sicilia_dashboard'] = {
             'total_processed': len(all_results),
             'count_ok': final_count_ok,
             'count_api': final_count_api,
@@ -1548,14 +1548,14 @@ def run(out_dir: Path, files: List[Any] = [], **kwargs) -> List[Path]:
 
             # Visualizzazione in Streamlit
             if df_duplicati:
-                 st.warning(f"⚠️ **Trovati {len(df_duplicati)} potenziali duplicati/simili**")
-                 with st.expander("Dettagli Duplicati"):
-                     st.dataframe(pd.DataFrame(df_duplicati))
+                 ctx.warning(f"⚠️ **Trovati {len(df_duplicati)} potenziali duplicati/simili**")
+                 with ctx.expander("Dettagli Duplicati"):
+                     ctx.dataframe(pd.DataFrame(df_duplicati))
             
             if df_province:
-                 st.error(f"🔴 **Trovati {len(df_province)} comuni in provincia errata**")
-                 with st.expander("Dettagli Errori Provincia"):
-                     st.dataframe(pd.DataFrame(df_province))
+                 ctx.error(f"🔴 **Trovati {len(df_province)} comuni in provincia errata**")
+                 with ctx.expander("Dettagli Errori Provincia"):
+                     ctx.dataframe(pd.DataFrame(df_province))
 
             return issues_map
 
@@ -1695,7 +1695,7 @@ def run(out_dir: Path, files: List[Any] = [], **kwargs) -> List[Path]:
         wb_tpl.save(out_tpl_path)
         
         # ── UPDATE PERSISTENT DASHBOARD ──────────────────────────────────────
-        st.session_state['prospetto_sicilia_dashboard'] = {
+        ctx.session_state['prospetto_sicilia_dashboard'] = {
             'total_processed': len(all_results),
             'count_ok': final_count_ok,
             'count_api': final_count_api,
@@ -1712,9 +1712,9 @@ def run(out_dir: Path, files: List[Any] = [], **kwargs) -> List[Path]:
     except Exception as e:
         import traceback
         full_tb = traceback.format_exc()
-        st.error(f"❌ Errore durante il popolamento del template: {e}\n\n```\n{full_tb}\n```")
+        ctx.error(f"❌ Errore durante il popolamento del template: {e}\n\n```\n{full_tb}\n```")
         # Update dashboard status even on error
-        st.session_state['prospetto_sicilia_dashboard'] = {
+        ctx.session_state['prospetto_sicilia_dashboard'] = {
             'total_processed': len(all_results),
             'count_ok': final_count_ok,
             'count_api': final_count_api,

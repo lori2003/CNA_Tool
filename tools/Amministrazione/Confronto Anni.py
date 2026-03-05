@@ -8,7 +8,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Any
 
-import streamlit as st
+from core.toolkit import ctx
 from openpyxl import load_workbook
 from openpyxl.utils import get_column_letter
 from openpyxl.styles import PatternFill, Font, Alignment
@@ -111,8 +111,8 @@ def get_template_status_minimal(values: Dict[str, Any]) -> str:
         template_path = project_root / template_val
     
     if template_path.exists():
-        st.error("⚠️ **ATTENZIONE:** Il template contiene **2 FOGLI**! Assicurati che vengano elaborati correttamente **ENTRAMBI**. Per la compilazione userai i dati del file **'effettivo_dopo_totale'** del mese di dicembre di quell'anno e copierai i valori o manualmente o in automatico.")
-        st.info("💡 **Nota Annuale:** Ogni anno ricordati di aggiornare la **Colonna B** del template con i dati dell'**anno passato** prima di caricare i nuovi tramite codice.")
+        ctx.error("⚠️ **ATTENZIONE:** Il template contiene **2 FOGLI**! Assicurati che vengano elaborati correttamente **ENTRAMBI**. Per la compilazione userai i dati del file **'effettivo_dopo_totale'** del mese di dicembre di quell'anno e copierai i valori o manualmente o in automatico.")
+        ctx.info("💡 **Nota Annuale:** Ogni anno ricordati di aggiornare la **Colonna B** del template con i dati dell'**anno passato** prima di caricare i nuovi tramite codice.")
         return "✅ **Template trovato**"
     else:
         return "❌ **Template non trovato**"
@@ -124,37 +124,37 @@ def render_output_config_ui(values: Dict[str, Any]) -> str:
     config = load_config()
     current_stored_name = config.get("output_filename", "CONFRONTO_DATI_RINNOVO")
     
-    st.markdown("Definisci il nome del file che verrà generato (senza estensione .xlsx).")
+    ctx.markdown("Definisci il nome del file che verrà generato (senza estensione .xlsx).")
     
-    col1, col2 = st.columns([3, 1])
+    col1, col2 = ctx.columns([3, 1])
     
     with col1:
-        new_name = st.text_input("Nome File Output", value=current_stored_name, key="output_filename_input")
+        new_name = ctx.text_input("Nome File Output", value=current_stored_name, key="output_filename_input")
         
     with col2:
-        st.write("") # Spacer
-        st.write("") 
-        if st.button("💾 Salva Default"):
+        ctx.write("") # Spacer
+        ctx.write("") 
+        if ctx.button("💾 Salva Default"):
             if new_name.strip():
                 if save_config({"output_filename": new_name.strip()}):
-                    st.success("Salvato!")
+                    ctx.success("Salvato!")
                 else:
-                    st.error("Errore salvataggio")
+                    ctx.error("Errore salvataggio")
             else:
-                st.warning("Nome non valido")
+                ctx.warning("Nome non valido")
 
     return "" # Ritorna vuoto perché renderizza direttamente
 
 def render_year_and_title_config(values: Dict[str, Any]) -> str:
     """Renderizza i campi per modificare anno e titolo del confronto."""
     
-    st.markdown("<span style='font-size: 20px;'><b>📅 Anno e Titolo</b></span>", unsafe_allow_html=True)
-    st.markdown("_Questi valori verranno inseriti nel file di output generato._")
+    ctx.markdown("<span style='font-size: 20px;'><b>📅 Anno e Titolo</b></span>", unsafe_allow_html=True)
+    ctx.markdown("_Questi valori verranno inseriti nel file di output generato._")
 
     # --- SEZIONE SIMULAZIONE ---
-    with st.expander("🔍 Verifica logica dinamica (Test anni futuri)"):
-        st.info("Cambiando l'anno qui sotto, i campi 'Anno' e 'Titolo' si aggiorneranno immediatamente per mostrare come funzionerà il tool in futuro.")
-        sim_year = st.number_input("Simula Anno Corrente", value=datetime.now().year, step=1, key="sim_year_val")
+    with ctx.expander("🔍 Verifica logica dinamica (Test anni futuri)"):
+        ctx.info("Cambiando l'anno qui sotto, i campi 'Anno' e 'Titolo' si aggiorneranno immediatamente per mostrare come funzionerà il tool in futuro.")
+        sim_year = ctx.number_input("Simula Anno Corrente", value=datetime.now().year, step=1, key="sim_year_val")
         
     # Calcolo valori dinamici
     effective_year = sim_year
@@ -165,10 +165,10 @@ def render_year_and_title_config(values: Dict[str, Any]) -> str:
     # Sincronizzazione Session State: se i valori calcolati sono diversi da quelli in memoria 
     # e l'utente non li ha appena modificati a mano, li aggiorniamo.
     # In Streamlit, per forzare l'aggiornamento di un widget con 'key', dobbiamo scrivere in session_state.
-    if "last_sim_year" not in st.session_state or st.session_state.last_sim_year != sim_year:
-        st.session_state["year_input"] = dynamic_year
-        st.session_state["title_input"] = dynamic_title
-        st.session_state["last_sim_year"] = sim_year
+    if "last_sim_year" not in ctx.session_state or ctx.session_state.last_sim_year != sim_year:
+        ctx.session_state["year_input"] = dynamic_year
+        ctx.session_state["title_input"] = dynamic_title
+        ctx.session_state["last_sim_year"] = sim_year
 
     # --- RECUPERO VALORI DAL TEMPLATE (Per contesto) ---
     template_val = values.get("excel_template_name")
@@ -195,13 +195,13 @@ def render_year_and_title_config(values: Dict[str, Any]) -> str:
             except: pass
 
     # --- RENDER CAMPI ---
-    st.text_input(
+    ctx.text_input(
         "Anno (cella B3)",
         key="year_input",
         help=f"Valore calcolato: {dynamic_year}. Nel template fisico c'è: '{current_year_in_template}'"
     )
     
-    st.text_area(
+    ctx.text_area(
         "Titolo (cella B1 - celle unite)",
         key="title_input",
         height=80,
@@ -223,7 +223,7 @@ def run(file_xlsx_input: Path, excel_template_name: str, out_dir: Path, **kwargs
     # OPPURE leggere session_state se possibile.
     # Per sicurezza, leggiamo session_state se presente, altrimenti config.
     
-    output_name = st.session_state.get("output_filename_input")
+    output_name = ctx.session_state.get("output_filename_input")
     if not output_name:
         config = load_config()
         output_name = config.get("output_filename", "CONFRONTO_DATI_RINNOVO")
@@ -360,8 +360,8 @@ def run(file_xlsx_input: Path, excel_template_name: str, out_dir: Path, **kwargs
 
     # --- AGGIORNAMENTO ANNO E TITOLO ---
     # Recupera i valori dall'UI
-    new_year = st.session_state.get("year_input", "01/01/2026")
-    new_title = st.session_state.get("title_input", "ASSICURATI AL 01/01/2026 CONFRONTATI COL 2025")
+    new_year = ctx.session_state.get("year_input", "01/01/2026")
+    new_title = ctx.session_state.get("title_input", "ASSICURATI AL 01/01/2026 CONFRONTATI COL 2025")
     
     # Aggiorna B3 con il nuovo anno
     ws["B3"].value = new_year.strip()
@@ -392,11 +392,11 @@ def run(file_xlsx_input: Path, excel_template_name: str, out_dir: Path, **kwargs
             rows_with_zeros.append(r)
             
     if rows_with_zeros:
-        st.warning(f"⚠️ **Attenzione:** Trovati valori uguali a 0 nelle colonne B o C alle righe: {', '.join(map(str, rows_with_zeros))}")
+        ctx.warning(f"⚠️ **Attenzione:** Trovati valori uguali a 0 nelle colonne B o C alle righe: {', '.join(map(str, rows_with_zeros))}")
     else:
-        st.info("✅ **Check Dati:** Nessun valore pari a 0 trovato nelle colonne B e C.")
+        ctx.info("✅ **Check Dati:** Nessun valore pari a 0 trovato nelle colonne B e C.")
 
-    st.success(f"File generato con successo: {out_filename}")
+    ctx.success(f"File generato con successo: {out_filename}")
     
     return [out_path]
 

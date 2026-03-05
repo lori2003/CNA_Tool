@@ -12,7 +12,7 @@ import pandas as pd
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 
-import streamlit as st
+from core.toolkit import ctx
 
 # ── Safe imports with auto-install ─────────────────────────────────────────
 try:
@@ -243,7 +243,7 @@ def _fill_template(df: pd.DataFrame, out_dir: Path, year: int, tmpl_override: st
     """
     tpl = Path(tmpl_override) if tmpl_override else _TEMPLATE_PATH
     if not tpl.exists():
-        st.warning(f"⚠️ Template non trovato: {tpl}")
+        ctx.warning(f"⚠️ Template non trovato: {tpl}")
         return None
 
     df = df.copy()
@@ -310,26 +310,26 @@ def _fill_template(df: pd.DataFrame, out_dir: Path, year: int, tmpl_override: st
 
 def _render_template_section() -> None:
     """Mostra la sezione Template con i pulsanti Sfoglia e Apri."""
-    st.markdown("---")
-    st.markdown("### 📋 Template")
+    ctx.markdown("---")
+    ctx.markdown("### 📋 Template")
     exists = _TEMPLATE_PATH.exists()
     status = "✅" if exists else "❌ non trovato"
-    col_info, col_b, col_o = st.columns([4, 1, 1])
+    col_info, col_b, col_o = ctx.columns([4, 1, 1])
     with col_info:
-        st.markdown(f"{status} &nbsp; `{_TEMPLATE_PATH.name}`")
+        ctx.markdown(f"{status} &nbsp; `{_TEMPLATE_PATH.name}`")
     with col_b:
-        if st.button("📂 Sfoglia", key="btn_tmpl_browse", use_container_width=True):
+        if ctx.button("📂 Sfoglia", key="btn_tmpl_browse", use_container_width=True):
             try:
                 subprocess.Popen(f'explorer /select,"{_TEMPLATE_PATH}"', shell=True)
             except Exception as e:
-                st.error(str(e))
+                ctx.error(str(e))
     with col_o:
-        if st.button("📄 Apri", key="btn_tmpl_open", use_container_width=True):
+        if ctx.button("📄 Apri", key="btn_tmpl_open", use_container_width=True):
             try:
                 os.startfile(str(_TEMPLATE_PATH))
             except Exception as e:
-                st.error(str(e))
-    st.markdown("---")
+                ctx.error(str(e))
+    ctx.markdown("---")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -493,7 +493,7 @@ def run(file_txt_input: Path, file_codici_nazioni: Path, out_dir: Path, template
 
     # ── Check API key ────────────────────────────────────────────────────
     if not LOCATIONIQ_API_KEY:
-        st.error("⚠️ API key LocationIQ non trovata! Verifica il file .env in API/x-Estrazione_Deleghe_estere/")
+        ctx.error("⚠️ API key LocationIQ non trovata! Verifica il file .env in API/x-Estrazione_Deleghe_estere/")
         return []
 
     # ── Clear old cache on every execution ────────────────────────────────
@@ -506,7 +506,7 @@ def run(file_txt_input: Path, file_codici_nazioni: Path, out_dir: Path, template
         with open(file_txt_input, 'r', encoding='latin1') as f:
             lines = f.readlines()
     except Exception as e:
-        st.error(f"Errore nella lettura del file TXT: {e}")
+        ctx.error(f"Errore nella lettura del file TXT: {e}")
         return []
 
     for line in lines:
@@ -515,7 +515,7 @@ def run(file_txt_input: Path, file_codici_nazioni: Path, out_dir: Path, template
             results.append(parsed)
 
     if not results:
-        st.warning("Nessun record trovato con i criteri specificati.")
+        ctx.warning("Nessun record trovato con i criteri specificati.")
         return []
 
     df = pd.DataFrame(results)
@@ -527,7 +527,7 @@ def run(file_txt_input: Path, file_codici_nazioni: Path, out_dir: Path, template
             file_codici_nazioni = _CODICI_NAZIONI_DEFAULT_PATH
             pass  # precaricato silenziosamente
         else:
-            st.error(f"File CODICI_NAZIONI non trovato: {_CODICI_NAZIONI_DEFAULT_PATH}")
+            ctx.error(f"File CODICI_NAZIONI non trovato: {_CODICI_NAZIONI_DEFAULT_PATH}")
             return []
     try:
         df_nazioni = pd.read_excel(file_codici_nazioni)
@@ -538,7 +538,7 @@ def run(file_txt_input: Path, file_codici_nazioni: Path, out_dir: Path, template
             df_nazioni[col_nome].astype(str).str.strip()
         ))
     except Exception as e:
-        st.error(f"Errore nella lettura del file CODICI_NAZIONI: {e}")
+        ctx.error(f"Errore nella lettura del file CODICI_NAZIONI: {e}")
         return []
 
     # ── 3. Classify records dynamically ──────────────────────────────────
@@ -556,7 +556,7 @@ def run(file_txt_input: Path, file_codici_nazioni: Path, out_dir: Path, template
     n_nan = (df['_tipo_record'] == 'nan').sum()
     n_italian = (df['_tipo_record'] == 'italian').sum()
 
-    st.info(
+    ctx.info(
         f"📊 Rilevati **{tot_records}** record totali:\n"
         f"- ✅ **{n_zcode}** con codice catastale estero (Z-code) → lookup da CODICI_NAZIONI\n"
         f"- ❓ **{n_nan}** senza codice catastale → geocoding LocationIQ\n"
@@ -583,8 +583,8 @@ def run(file_txt_input: Path, file_codici_nazioni: Path, out_dir: Path, template
 
         # Geocode each unique Comune once
         comune_to_country: Dict[str, Optional[str]] = {}
-        progress_bar = st.progress(0, text="Geocoding comuni unici...")
-        status_text = st.empty()
+        progress_bar = ctx.progress(0, text="Geocoding comuni unici...")
+        status_text = ctx.empty()
         resolved_count = 0
         failed_count = 0
         start_time = time.time()
@@ -657,7 +657,7 @@ def run(file_txt_input: Path, file_codici_nazioni: Path, out_dir: Path, template
         total_failed_records = failed_count_records + zcode_unresolved.sum()
         total_resolved_records = (df['Nazione Estera'] != 'NON IDENTIFICATO').sum()
 
-        st.success(
+        ctx.success(
             f"🌐 Geocoding completato in **{tot_m} min {tot_s} sec**:\n"
             f"- 🔍 **{tot_records}** record analizzati\n"
             f"- ✅ **{total_resolved_records}** risolti\n"
@@ -679,7 +679,7 @@ def run(file_txt_input: Path, file_codici_nazioni: Path, out_dir: Path, template
     # ── 6b. Fill template with aggregated data per nation ─────────────
     tmpl_out = _fill_template(df, out_dir, current_year, template_path, titolo_b4)
     if tmpl_out:
-        st.success(f"📊 Prospetto per nazione compilato: **{tmpl_out.name}**")
+        ctx.success(f"📊 Prospetto per nazione compilato: **{tmpl_out.name}**")
 
     # ── 6c. Estrazione dettagliata (solo se checkbox spuntata) ─────────
     out_path = None
@@ -687,7 +687,7 @@ def run(file_txt_input: Path, file_codici_nazioni: Path, out_dir: Path, template
         out_filename = f"Estrazione_Deleghe_Estere_{current_year}.xlsx"
         out_path = out_dir / out_filename
         df.to_excel(out_path, index=False)
-        st.info(f"📄 File di estrazione dettagliato prodotto: **{out_filename}**")
+        ctx.info(f"📄 File di estrazione dettagliato prodotto: **{out_filename}**")
 
     # ── 7. Compute summary stats and persist in session_state ─────────
     n_empty = (df['Nazione Estera'] == 'NON IDENTIFICATO').sum()
@@ -699,7 +699,7 @@ def run(file_txt_input: Path, file_codici_nazioni: Path, out_dir: Path, template
     country_counts.columns = ['Nazione', 'N. Record']
 
     # Store in session_state so the dashboard survives reruns/downloads
-    st.session_state['deleghe_estere_dashboard'] = {
+    ctx.session_state['deleghe_estere_dashboard'] = {
         'tot_records': tot_records,
         'n_empty': int(n_empty),
         'country_table': country_counts.to_dict('records'),
@@ -718,7 +718,7 @@ def run(file_txt_input: Path, file_codici_nazioni: Path, out_dir: Path, template
 
 def _render_dashboard() -> None:
     """Display the summary dashboard from session_state."""
-    data = st.session_state.get('deleghe_estere_dashboard')
+    data = ctx.session_state.get('deleghe_estere_dashboard')
     if not data:
         return
 
@@ -726,9 +726,9 @@ def _render_dashboard() -> None:
     n_empty = data['n_empty']
     table = data['country_table']
 
-    st.success(f"✅ Elaborazione completata! Estratti **{tot}** record.")
+    ctx.success(f"✅ Elaborazione completata! Estratti **{tot}** record.")
 
     # Country totals table
-    st.markdown("### 🌍 Totale per Nazione")
+    ctx.markdown("### 🌍 Totale per Nazione")
     df_table = pd.DataFrame(table)
-    st.dataframe(df_table, use_container_width=True, hide_index=True)
+    ctx.dataframe(df_table, use_container_width=True, hide_index=True)

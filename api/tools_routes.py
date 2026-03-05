@@ -91,7 +91,7 @@ def reload_tools():
 def get_dynamic_info(uid: str, key: str):
     """
     Chiama la funzione dynamic_info di un param e restituisce
-    i messaggi catturati dallo shim streamlit.
+    i messaggi catturati da core/toolkit.py.
     """
     t = get_tool_by_uid(uid)
     if not t:
@@ -113,15 +113,15 @@ def get_dynamic_info(uid: str, key: str):
     if not callable(func):
         return {"messages": [], "text": ""}
 
-    import streamlit as _st
-    _st._clear_messages()
+    from core.toolkit import _clear_messages, _messages
+    _clear_messages()
 
     try:
         result = func({})
     except Exception as e:
         return {"messages": [{"type": "error", "text": str(e)}], "text": ""}
 
-    captured = list(_st._messages())
+    captured = list(_messages())
     text = str(result).strip() if result and isinstance(result, str) else ""
 
     if text and text not in ("None", ""):

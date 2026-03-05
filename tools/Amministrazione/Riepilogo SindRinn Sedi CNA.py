@@ -7,7 +7,7 @@ import pandas as pd
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 
-import streamlit as st
+from core.toolkit import ctx
 from openpyxl import load_workbook
 from openpyxl.utils import get_column_letter
 
@@ -280,7 +280,7 @@ def run(file_txt_input: Path, template_path: str, mapping_sedi: str, regional_to
     # Process Estero
     rec_est, match_est = process_data(file_txt_input, abs_template_path, mapping_sedi, regional_totals_config, out_estero, is_estero=True)
 
-    st.success(f"Elaborazione completata!\n"
+    ctx.success(f"Elaborazione completata!\n"
                f"- **Standard**: {rec_std} record, {match_std} corrispondenze.\n"
                f"- **Estero**: {rec_est} record, {match_est} corrispondenze.")
 

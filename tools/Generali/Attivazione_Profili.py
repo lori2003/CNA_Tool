@@ -4,7 +4,7 @@ import json
 import time
 from datetime import datetime
 from pathlib import Path
-import streamlit as st
+from core.toolkit import ctx
 import re
 
 try:
@@ -126,11 +126,11 @@ def _docx_to_pdf_libreoffice(docx_path: Path, pdf_dest: Path) -> bool:
 def genera_nuovo_profilo(nome, cognome, tipo_cartella):
     """Crea cartella, genera PDF e garantisce l'eliminazione del Word."""
     if not _DOCX_AVAILABLE:
-        st.error("❌ Libreria python-docx non installata.")
+        ctx.error("❌ Libreria python-docx non installata.")
         return False
 
     if not TEMPLATE_PATH.exists():
-        st.error(f"Template non trovato in: {TEMPLATE_PATH}")
+        ctx.error(f"Template non trovato in: {TEMPLATE_PATH}")
         return False
 
     folder_name = f"{nome.strip()} {cognome.strip()} ({tipo_cartella})"
@@ -184,7 +184,7 @@ def genera_nuovo_profilo(nome, cognome, tipo_cartella):
             # LibreOffice headless (Linux / Render)
             ok = _docx_to_pdf_libreoffice(docx_temp, pdf_dest)
             if not ok:
-                st.error("❌ Conversione PDF fallita. Assicurati che LibreOffice sia installato.")
+                ctx.error("❌ Conversione PDF fallita. Assicurati che LibreOffice sia installato.")
                 return False
             
         # 3. ELIMINAZIONE CERTIFICATA DEL WORD
@@ -199,7 +199,7 @@ def genera_nuovo_profilo(nome, cognome, tipo_cartella):
             
         return True
     except Exception as e:
-        st.error(f"Errore tecnico: {e}")
+        ctx.error(f"Errore tecnico: {e}")
         return False
 
 
@@ -225,7 +225,7 @@ def importa_profilo_esistente(nome, cognome, tipo_cartella, uploaded_files):
                     out_f.write(f.getvalue())
         return True
     except Exception as e:
-        st.error(f"Errore durante l'importazione: {e}")
+        ctx.error(f"Errore durante l'importazione: {e}")
         return False
 
 def estrai_nome_cognome_da_filename(filename):
@@ -252,15 +252,15 @@ def estrai_nome_cognome_da_filename(filename):
 # -----------------------------------------------------------------------------
 def get_ui_top():
     # --- INIZIALIZZAZIONE SESSION STATE ---
-    if "import_profiles" not in st.session_state:
-        st.session_state["import_profiles"] = {}
-    if "last_import_sig" not in st.session_state:
-        st.session_state["last_import_sig"] = ""
-    if "import_in_progress" not in st.session_state:
-        st.session_state["import_in_progress"] = False
+    if "import_profiles" not in ctx.session_state:
+        ctx.session_state["import_profiles"] = {}
+    if "last_import_sig" not in ctx.session_state:
+        ctx.session_state["last_import_sig"] = ""
+    if "import_in_progress" not in ctx.session_state:
+        ctx.session_state["import_in_progress"] = False
 
     # CSS per nascondere pulsante standard e gestire i bordi rossi
-    st.markdown("""
+    ctx.markdown("""
         <style>
         /* Nasconde il pulsante Esegui di default */
         div[data-testid="stButton"] button[key^="run_"] { display: none !important; }
@@ -284,44 +284,44 @@ def get_ui_top():
 
     # --- SETTINGS ARCHIVIO (Fisicamente dentro il bordo) ---
     archive_path = load_config()
-    with st.container(border=True):
-        st.markdown("<h3 style='text-align: center; margin-top: -10px;'>📂 DESTINAZIONE ARCHIVIO</h3>", unsafe_allow_html=True)
-        c_path, c_save, c_open = st.columns([0.6, 0.2, 0.2])
+    with ctx.container(border=True):
+        ctx.markdown("<h3 style='text-align: center; margin-top: -10px;'>📂 DESTINAZIONE ARCHIVIO</h3>", unsafe_allow_html=True)
+        c_path, c_save, c_open = ctx.columns([0.6, 0.2, 0.2])
         with c_path:
-            new_path = st.text_input("Path", value=archive_path, label_visibility="collapsed", key="cfg_path")
+            new_path = ctx.text_input("Path", value=archive_path, label_visibility="collapsed", key="cfg_path")
         with c_save:
-            if st.button("💾 Salva", use_container_width=True, key="save_cfg_btn"):
+            if ctx.button("💾 Salva", use_container_width=True, key="save_cfg_btn"):
                 save_config(new_path)
-                st.rerun()
+                ctx.rerun()
         with c_open:
-            if st.button("📂 Vai", use_container_width=True, key="open_cfg_btn"):
+            if ctx.button("📂 Vai", use_container_width=True, key="open_cfg_btn"):
                 os.system(f'explorer "{new_path}"')
 
-    st.write("") # Spaciatore
+    ctx.write("") # Spaciatore
 
     # --- SEZIONE CREAZIONE ---
-    st.markdown("## ✨ Crea Nuovo Profilo")
-    with st.container(border=True):
-        col1, col2 = st.columns(2)
+    ctx.markdown("## ✨ Crea Nuovo Profilo")
+    with ctx.container(border=True):
+        col1, col2 = ctx.columns(2)
         with col1:
-            n = st.text_input("Nome", placeholder="Es: Mario", key="manual_nome")
+            n = ctx.text_input("Nome", placeholder="Es: Mario", key="manual_nome")
         with col2:
-            c = st.text_input("Cognome", placeholder="Es: Rossi", key="manual_cognome")
-        t = st.radio("Tipo Cartella", ["Bancadati", "INPS", "BD e INPS"], horizontal=True)
-        if st.button("Crea Cartella", type="primary", use_container_width=True, key="main_gen_btn"):
+            c = ctx.text_input("Cognome", placeholder="Es: Rossi", key="manual_cognome")
+        t = ctx.radio("Tipo Cartella", ["Bancadati", "INPS", "BD e INPS"], horizontal=True)
+        if ctx.button("Crea Cartella", type="primary", use_container_width=True, key="main_gen_btn"):
             if n and c:
-                with st.spinner("Generazione PDF e pulizia in corso..."):
+                with ctx.spinner("Generazione PDF e pulizia in corso..."):
                     if genera_nuovo_profilo(n, c, t):
-                        st.success(f"PDF creato per {n} {c}")
-                        st.rerun()
+                        ctx.success(f"PDF creato per {n} {c}")
+                        ctx.rerun()
             else:
-                st.warning("⚠️ Inserisci sia Nome che Cognome.")
+                ctx.warning("⚠️ Inserisci sia Nome che Cognome.")
 
     # --- SEZIONE IMPORTAZIONE ---
-    st.markdown("## 📤 Importa File Già Pronti")
-    with st.container(border=True):
+    ctx.markdown("## 📤 Importa File Già Pronti")
+    with ctx.container(border=True):
         # Sposto il caricatore in alto per un drop immediato
-        uploaded_files = st.file_uploader("1. Trascina qui i file (PDF, Word, etc.)", 
+        uploaded_files = ctx.file_uploader("1. Trascina qui i file (PDF, Word, etc.)", 
                                          accept_multiple_files=True, 
                                          key="upload_import")
         
@@ -330,8 +330,8 @@ def get_ui_top():
             files_sig = "|".join([f"{f.name}_{f.size}" for f in uploaded_files])
             
             # Se i file sono cambiati, aggiorniamo la lista profili senza perdere i dati esistenti
-            if st.session_state["last_import_sig"] != files_sig:
-                current_profiles = st.session_state["import_profiles"]
+            if ctx.session_state["last_import_sig"] != files_sig:
+                current_profiles = ctx.session_state["import_profiles"]
                 new_profiles = {}
                 
                 for f in uploaded_files:
@@ -347,81 +347,81 @@ def get_ui_top():
                             "tipo": "Bancadati"
                         }
                 
-                st.session_state["import_profiles"] = new_profiles
-                st.session_state["last_import_sig"] = files_sig
-                st.rerun()
+                ctx.session_state["import_profiles"] = new_profiles
+                ctx.session_state["last_import_sig"] = files_sig
+                ctx.rerun()
 
-            st.info(f"✅ {len(uploaded_files)} file pronti per l'importazione.")
+            ctx.info(f"✅ {len(uploaded_files)} file pronti per l'importazione.")
             
             # --- IMPOSTAZIONI GLOBALI ---
-            with st.expander("⚙️ Impostazioni Globali (Applica a tutti)", expanded=False):
-                col_glob_opt, col_glob_val = st.columns([0.4, 0.6])
+            with ctx.expander("⚙️ Impostazioni Globali (Applica a tutti)", expanded=False):
+                col_glob_opt, col_glob_val = ctx.columns([0.4, 0.6])
                 with col_glob_opt:
-                    apply_all = st.checkbox("Applica lo stesso tipo a tutti", value=False, key="apply_all_toggle")
+                    apply_all = ctx.checkbox("Applica lo stesso tipo a tutti", value=False, key="apply_all_toggle")
                 with col_glob_val:
-                    global_type = st.radio("Tipo Cartella Globale", ["Bancadati", "INPS", "BD e INPS"], 
+                    global_type = ctx.radio("Tipo Cartella Globale", ["Bancadati", "INPS", "BD e INPS"], 
                                          horizontal=True, key="global_type", disabled=not apply_all)
 
-            st.write("---")
+            ctx.write("---")
             
             # --- LOOP SUI FILE ---
             for i, f in enumerate(uploaded_files):
                 fname = f.name
-                if fname not in st.session_state["import_profiles"]:
+                if fname not in ctx.session_state["import_profiles"]:
                     continue # Sicurezza
                 
-                profile = st.session_state["import_profiles"][fname]
+                profile = ctx.session_state["import_profiles"][fname]
                 
                 # Container per singolo file
-                st.markdown(f"<div class='file-block'>📄 <b>File:</b> {fname}</div>", unsafe_allow_html=True)
+                ctx.markdown(f"<div class='file-block'>📄 <b>File:</b> {fname}</div>", unsafe_allow_html=True)
                 
-                col_n, col_swap, col_c, col_t = st.columns([0.28, 0.08, 0.28, 0.36])
+                col_n, col_swap, col_c, col_t = ctx.columns([0.28, 0.08, 0.28, 0.36])
                 
                 # SPOSTIAMO LO SWAP PRIMA DEGLI INPUT NEL CODICE
                 with col_swap:
-                    st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
-                    if st.button("🔄", key=f"swap_{fname}", help="Scambia Nome e Cognome", use_container_width=True):
+                    ctx.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
+                    if ctx.button("🔄", key=f"swap_{fname}", help="Scambia Nome e Cognome", use_container_width=True):
                         # Prendiamo i valori attuali dai widget (o dal profilo se non ancora toccati)
-                        n_current = st.session_state.get(f"n_{fname}", profile["nome"])
-                        c_current = st.session_state.get(f"c_{fname}", profile["cognome"])
+                        n_current = ctx.session_state.get(f"n_{fname}", profile["nome"])
+                        c_current = ctx.session_state.get(f"c_{fname}", profile["cognome"])
                         
                         # Invertiamo nel dizionario principale
-                        st.session_state["import_profiles"][fname]["nome"] = c_current
-                        st.session_state["import_profiles"][fname]["cognome"] = n_current
+                        ctx.session_state["import_profiles"][fname]["nome"] = c_current
+                        ctx.session_state["import_profiles"][fname]["cognome"] = n_current
                         
                         # Aggiorniamo le chiavi widget PRIMA del rerun per sicurezza
-                        st.session_state[f"n_{fname}"] = c_current
-                        st.session_state[f"c_{fname}"] = n_current
-                        st.rerun()
+                        ctx.session_state[f"n_{fname}"] = c_current
+                        ctx.session_state[f"c_{fname}"] = n_current
+                        ctx.rerun()
 
                 with col_n:
-                    new_n = st.text_input(f"Nome", value=profile["nome"], key=f"n_{fname}")
-                    st.session_state["import_profiles"][fname]["nome"] = new_n
+                    new_n = ctx.text_input(f"Nome", value=profile["nome"], key=f"n_{fname}")
+                    ctx.session_state["import_profiles"][fname]["nome"] = new_n
                 
                 with col_c:
-                    new_c = st.text_input(f"Cognome", value=profile["cognome"], key=f"c_{fname}")
-                    st.session_state["import_profiles"][fname]["cognome"] = new_c
+                    new_c = ctx.text_input(f"Cognome", value=profile["cognome"], key=f"c_{fname}")
+                    ctx.session_state["import_profiles"][fname]["cognome"] = new_c
                 
                 with col_t:
                     current_type = global_type if apply_all else profile["tipo"]
-                    new_t = st.radio(f"Tipo", ["Bancadati", "INPS", "BD e INPS"], 
+                    new_t = ctx.radio(f"Tipo", ["Bancadati", "INPS", "BD e INPS"], 
                                    index=["Bancadati", "INPS", "BD e INPS"].index(current_type),
                                    horizontal=True, key=f"t_{fname}", 
                                    disabled=apply_all,
                                    label_visibility="visible")
                     if not apply_all:
-                        st.session_state["import_profiles"][fname]["tipo"] = new_t
+                        ctx.session_state["import_profiles"][fname]["tipo"] = new_t
 
-            st.write("")
-            if st.button(f"Crea {len(uploaded_files)} Cartelle e Importa Tutto", type="primary", use_container_width=True, key="import_all_btn"):
-                if not st.session_state.get("import_in_progress", False):
-                    st.session_state["import_in_progress"] = True
+            ctx.write("")
+            if ctx.button(f"Crea {len(uploaded_files)} Cartelle e Importa Tutto", type="primary", use_container_width=True, key="import_all_btn"):
+                if not ctx.session_state.get("import_in_progress", False):
+                    ctx.session_state["import_in_progress"] = True
                     successos = 0
                     errors = []
                     
-                    with st.spinner("Creazione profili in corso..."):
+                    with ctx.spinner("Creazione profili in corso..."):
                         for f in uploaded_files:
-                            p = st.session_state["import_profiles"][f.name]
+                            p = ctx.session_state["import_profiles"][f.name]
                             p_type = global_type if apply_all else p["tipo"]
                             
                             if p["nome"] and p["cognome"]:
@@ -433,26 +433,26 @@ def get_ui_top():
                                 errors.append(f"{f.name} (Dati mancanti)")
                     
                     if successos > 0:
-                        st.success(f"✅ Importati con successo {successos} profili.")
+                        ctx.success(f"✅ Importati con successo {successos} profili.")
                         # RESET TOTALE PER EVITARE DOPPIONI
-                        st.session_state["import_profiles"] = {}
-                        st.session_state["last_import_sig"] = "RESET_DONE"
-                        st.session_state["import_in_progress"] = False
+                        ctx.session_state["import_profiles"] = {}
+                        ctx.session_state["last_import_sig"] = "RESET_DONE"
+                        ctx.session_state["import_in_progress"] = False
                         time.sleep(1.5)
-                        st.rerun()
+                        ctx.rerun()
                     
-                    st.session_state["import_in_progress"] = False
+                    ctx.session_state["import_in_progress"] = False
         else:
-            st.caption("Trascina i file sopra per iniziare l'importazione multipla.")
+            ctx.caption("Trascina i file sopra per iniziare l'importazione multipla.")
 
-    st.divider()
+    ctx.divider()
 
     # --- SEZIONE DASHBOARD ---
-    st.markdown("## 📂 Profili In Sospeso")
-    search_query = st.text_input("🔎 Ricerca nominativo...", placeholder="Cerca tra i sospesi...").lower()
+    ctx.markdown("## 📂 Profili In Sospeso")
+    search_query = ctx.text_input("🔎 Ricerca nominativo...", placeholder="Cerca tra i sospesi...").lower()
 
     if not DIR_IN_SOSPESO.exists():
-        st.info("Nessuna cartella trovata.")
+        ctx.info("Nessuna cartella trovata.")
         return
 
     all_items = sorted([p for p in DIR_IN_SOSPESO.iterdir() if p.is_dir()], key=lambda p: p.stat().st_ctime, reverse=True)
@@ -460,22 +460,22 @@ def get_ui_top():
 
     if not filtered_items:
         if search_query:
-            st.warning(f"Nessun risultato per: '{search_query}'")
+            ctx.warning(f"Nessun risultato per: '{search_query}'")
         else:
-            st.info("📭 Nessun operatore in sospeso.")
+            ctx.info("📭 Nessun operatore in sospeso.")
     else:
         for folder in filtered_items:
-            with st.container(border=True):
-                col_info, col_open, col_arch, col_del = st.columns([0.46, 0.18, 0.18, 0.18])
+            with ctx.container(border=True):
+                col_info, col_open, col_arch, col_del = ctx.columns([0.46, 0.18, 0.18, 0.18])
                 with col_info:
-                    st.markdown(f"**{folder.name}**")
+                    ctx.markdown(f"**{folder.name}**")
                     ctime = datetime.fromtimestamp(folder.stat().st_ctime).strftime("%d/%m/%Y %H:%M")
-                    st.caption(f"📅 {ctime}")
+                    ctx.caption(f"📅 {ctime}")
                 with col_open:
-                    if st.button("📂 Apri", key=f"open_{folder.name}", use_container_width=True):
+                    if ctx.button("📂 Apri", key=f"open_{folder.name}", use_container_width=True):
                         os.system(f'explorer "{folder}"') 
                 with col_arch:
-                    if st.button("🗄️ Archiva", key=f"arch_{folder.name}", use_container_width=True):
+                    if ctx.button("🗄️ Archiva", key=f"arch_{folder.name}", use_container_width=True):
                         try:
                             target_archive = load_config()
                             dest_base = Path(target_archive)
@@ -483,16 +483,16 @@ def get_ui_top():
                             dest = dest_base / folder.name
                             if dest.exists(): dest = dest_base / f"{folder.name}_{datetime.now().strftime('%H%M%S')}"
                             shutil.move(str(folder), str(dest))
-                            st.rerun()
+                            ctx.rerun()
                         except Exception as e:
-                            st.error(f"Errore archivio: {e}")
+                            ctx.error(f"Errore archivio: {e}")
                 with col_del:
-                    if st.button("🗑️", key=f"del_{folder.name}", use_container_width=True, help="Elimina definitivamente"):
+                    if ctx.button("🗑️", key=f"del_{folder.name}", use_container_width=True, help="Elimina definitivamente"):
                         try:
                             shutil.rmtree(folder)
-                            st.rerun()
+                            ctx.rerun()
                         except Exception as e:
-                            st.error(f"Errore eliminazione: {e}")
+                            ctx.error(f"Errore eliminazione: {e}")
 
 def run(out_dir, modalita="Crea nuovo profilo", nome="", cognome="",
         tipo_cartella="Bancadati", files=None, **kwargs):

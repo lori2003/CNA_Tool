@@ -204,7 +204,7 @@ def save_config(data: Dict[str, Any]) -> None:
 # --- Dynamic Params (Preview & Startup Loader) ---
 
 def get_dynamic_params(uploads: Dict[str, Any], current_params: Dict[str, Any]) -> List[Dict[str, Any]]:
-    import streamlit as st
+    from core.toolkit import ctx as st
     
     # 1. STARTUP LOADER: Inietta i valori salvati nel Session State
     try:

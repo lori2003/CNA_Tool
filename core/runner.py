@@ -34,12 +34,9 @@ def run_tool(
     if runner is None:
         return False, "Tool non ha una funzione run().", None, []
 
-    # Reset stato streamlit (session_state + messaggi) per ogni run
-    try:
-        import streamlit as _st
-        _st._reset_for_run()
-    except Exception:
-        pass
+    # Reset stato per ogni run
+    from core.toolkit import _reset_for_run
+    _reset_for_run()
 
     with tempfile.TemporaryDirectory() as tmp:
         out_dir = Path(tmp) / "output"
@@ -119,9 +116,9 @@ def run_tool(
 
 
 def _collect_events() -> List[Dict[str, Any]]:
-    """Raccoglie e restituisce gli eventi catturati dallo shim streamlit."""
+    """Raccoglie e restituisce gli eventi catturati dal toolkit."""
     try:
-        import streamlit as _st
-        return list(_st._messages())
+        from core.toolkit import _messages
+        return list(_messages())
     except Exception:
         return []

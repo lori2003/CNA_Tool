@@ -7,7 +7,7 @@ import pandas as pd
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Any
 
-import streamlit as st
+from core.toolkit import ctx
 from openpyxl import load_workbook
 from openpyxl.utils import get_column_letter
 
@@ -124,16 +124,16 @@ def get_excel_preview(values: Dict[str, Any]) -> str:
     """Genera un'anteprima dell'Excel caricato per verifica utente."""
     # Cerchiamo l'input caricato nello session_state di Streamlit
     excel_key = None
-    for k in st.session_state.keys():
+    for k in ctx.session_state.keys():
         if k.endswith("file_xlsx_input") and k.startswith("up_"):
             excel_key = k
             break
             
-    if not excel_key or st.session_state[excel_key] is None:
+    if not excel_key or ctx.session_state[excel_key] is None:
         return "ℹ️ **In attesa del caricamento:** Carica un file Excel per vedere l'anteprima e il controllo qualità."
     
     try:
-        file_obj = st.session_state[excel_key]
+        file_obj = ctx.session_state[excel_key]
         # Lettura per ottenere info complete
         file_obj.seek(0)
         # Leggiamo tutto per avere il conteggio righe preciso (specifica engine per evitare errori)
@@ -150,9 +150,9 @@ def get_excel_preview(values: Dict[str, Any]) -> str:
         if num_cols < 3:
             msg += f"\n⚠️ **ATTENZIONE:** Il file sembra avere poche colonne. Verifica che i dati inizino correttamente (Sede in 1ª colonna, Importi dalla 3ª in poi).\n"
         
-        st.markdown(msg)
-        st.markdown("**Dati trovati (Elenco completo):**")
-        st.dataframe(df_info, use_container_width=True)
+        ctx.markdown(msg)
+        ctx.markdown("**Dati trovati (Elenco completo):**")
+        ctx.dataframe(df_info, use_container_width=True)
         return "" 
     except Exception as e:
         return f"❌ **Errore durante l'anteprima:** {e}"
@@ -228,9 +228,9 @@ def get_template_header_preview(values: Dict[str, Any]) -> str:
         from openpyxl import load_workbook
         
         # Titolo (ancora più piccolo)
-        st.markdown("#### 📋 Intestazione Template")
+        ctx.markdown("#### 📋 Intestazione Template")
         # Promemoria anno
-        st.warning("⚠️ Ricorda di controllare sempre l'**anno** nell'intestazione 'Titolo' prima di procedere!")
+        ctx.warning("⚠️ Ricorda di controllare sempre l'**anno** nell'intestazione 'Titolo' prima di procedere!")
         
         # Legge le intestazioni dal file
         wb = load_workbook(template_path, data_only=False)
@@ -266,7 +266,7 @@ def get_template_header_preview(values: Dict[str, Any]) -> str:
         edited_headers = {}
         for row_num, row_content in header_data.items():
             label = "Titolo" if row_num == 1 else "Colonne"
-            edited_headers[row_num] = st.text_area(
+            edited_headers[row_num] = ctx.text_area(
                 label,
                 value=row_content,
                 key=f"header_edit_{row_num}",
@@ -274,7 +274,7 @@ def get_template_header_preview(values: Dict[str, Any]) -> str:
             )
         
         # Pulsante per salvare le modifiche
-        if st.button("💾 Salva Modifiche Intestazione", key="save_header_btn"):
+        if ctx.button("💾 Salva Modifiche Intestazione", key="save_header_btn"):
             try:
                 from openpyxl.cell.cell import MergedCell
                 wb_write = load_workbook(template_path)
@@ -291,11 +291,11 @@ def get_template_header_preview(values: Dict[str, Any]) -> str:
                 
                 wb_write.save(template_path)
                 wb_write.close()
-                st.success("✅ Intestazioni salvate con successo!")
+                ctx.success("✅ Intestazioni salvate con successo!")
             except PermissionError:
-                st.error("❌ Impossibile salvare: il file è aperto in un altro programma.")
+                ctx.error("❌ Impossibile salvare: il file è aperto in un altro programma.")
             except Exception as e:
-                st.error(f"❌ Errore durante il salvataggio: {e}")
+                ctx.error(f"❌ Errore durante il salvataggio: {e}")
         
         return ""  # Ritorna stringa vuota perché abbiamo già renderizzato
         
@@ -553,6 +553,6 @@ def run(file_xlsx_input: Path, excel_template_name: str, mapping_sedi: str, regi
     
     wb.save(out_path)
     
-    st.success(f"Fatto! Risultati pronti. (Processate {row_count} righe dal file di input con {match_count} corrispondenze trovate)")
+    ctx.success(f"Fatto! Risultati pronti. (Processate {row_count} righe dal file di input con {match_count} corrispondenze trovate)")
     
     return [out_path]

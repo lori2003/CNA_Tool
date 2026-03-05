@@ -127,7 +127,7 @@ def _get_cv2():
     # Evita ricorsione infinita usando st.session_state se disponibile
     install_tried = False
     try:
-        import streamlit as st
+        from core.toolkit import ctx as st
         # Se abbiamo già provato in QUESTA sessione di esecuzione script, non riprovare
         if "opencv_install_attempted" in st.session_state:
             install_tried = True
@@ -136,7 +136,7 @@ def _get_cv2():
     if not install_tried:
         log_event("⚠️ OpenCV non trovato. Tento installazione automatica...")
         try:
-            import streamlit as st
+            from core.toolkit import ctx as st
             st.session_state["opencv_install_attempted"] = True
             st.toast("📦 Installazione OpenCV in corso...", icon="⏳")
         except: pass
@@ -146,7 +146,7 @@ def _get_cv2():
         if success:
             log_event("✅ OpenCV installato con successo! Riprovo import...")
             try:
-                import streamlit as st
+                from core.toolkit import ctx as st
                 st.toast("✅ OpenCV installato! Ricarica in corso...", icon="🎉")
                 time.sleep(1) 
                 st.rerun()
@@ -188,12 +188,12 @@ if "--server" in sys.argv:
         with open(LOG_FILE, "a") as f: f.write(f"[FATAL] Missing dependency: {e}\n")
         sys.exit(1)
 
+from core.toolkit import ctx as st
 try:
-    import streamlit as st
     import qrcode
     import requests
     from PIL import Image, ImageOps
-except ImportError: 
+except ImportError:
     pass
 
 # ==============================================================================

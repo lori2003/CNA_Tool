@@ -62,6 +62,11 @@ app.mount("/static", StaticFiles(directory=str(WEB_DIR)), name="static")
 @app.get("/")
 @app.get("/{full_path:path}")
 async def spa(full_path: str = ""):
+    # Evita che la SPA intercetti api o statici se non sono stati già gestiti
+    if full_path.startswith("api/") or full_path.startswith("static/"):
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Not Found")
+    
     index = WEB_DIR / "index.html"
     if index.exists():
         return FileResponse(str(index))

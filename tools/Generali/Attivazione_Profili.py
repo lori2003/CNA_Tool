@@ -107,13 +107,26 @@ TOOL = {
 # -----------------------------------------------------------------------------
 # LOGICA DI BUSINESS
 # -----------------------------------------------------------------------------
+def _docx_to_pdf_libreoffice(docx_path: Path, pdf_dest: Path) -> bool:
+    """Converte .docx in .pdf usando LibreOffice headless (Linux/Cloud)."""
+    import subprocess, sys, shutil as _shutil
+    lo = _shutil.which("libreoffice") or _shutil.which("libreoffice7.6") or "libreoffice"
+    result = subprocess.run(
+        [lo, "--headless", "--convert-to", "pdf", "--outdir", str(pdf_dest.parent), str(docx_path)],
+        capture_output=True, text=True, timeout=60
+    )
+    # LibreOffice salva il file con lo stesso stem + .pdf
+    generated = pdf_dest.parent / (docx_path.stem + ".pdf")
+    if generated.exists() and generated != pdf_dest:
+        generated.rename(pdf_dest)
+    return (result.returncode == 0) and pdf_dest.exists()
+
+
+# -----------------------------------------------------------------------------
 def genera_nuovo_profilo(nome, cognome, tipo_cartella):
     """Crea cartella, genera PDF e garantisce l'eliminazione del Word."""
-    if not _COM_AVAILABLE or not _DOCX_AVAILABLE:
-        st.error(
-            "❌ Questo tool richiede **Microsoft Word** e le librerie COM di Windows. "
-            "Non è compatibile con Linux/Cloud — usalo solo sul tuo PC locale."
-        )
+    if not _DOCX_AVAILABLE:
+        st.error("❌ Libreria python-docx non installata.")
         return False
 
     if not TEMPLATE_PATH.exists():
@@ -152,33 +165,33 @@ def genera_nuovo_profilo(nome, cognome, tipo_cartella):
                     break
         doc.save(str(docx_temp))
 
-        # 2. Conversione PDF con pulizia COM
-        pythoncom.CoInitialize()
-        try:
-            word = comtypes.client.CreateObject("Word.Application")
-            word.Visible = False
-            abs_docx = str(docx_temp.resolve())
-            abs_pdf = str(pdf_dest.resolve())
-            
-            doc_word = word.Documents.Open(abs_docx)
-            doc_word.SaveAs(abs_pdf, FileFormat=17)
-            doc_word.Close(0) # 0 = wdDoNotSaveChanges
-            word.Quit()
-            
-            # Rilascio oggetti per permettere eliminazione
-            del doc_word
-            del word
-            time.sleep(1.0) # Attesa per rilascio file system
-        finally:
-            pythoncom.CoUninitialize()
-
+        # 2. Conversione PDF — Windows: COM, Linux: LibreOffice headless
+        import sys as _sys
+        if _COM_AVAILABLE and _sys.platform == "win32":
+            pythoncom.CoInitialize()
+            try:
+                word = comtypes.client.CreateObject("Word.Application")
+                word.Visible = False
+                doc_word = word.Documents.Open(str(docx_temp.resolve()))
+                doc_word.SaveAs(str(pdf_dest.resolve()), FileFormat=17)
+                doc_word.Close(0)
+                word.Quit()
+                del doc_word, word
+                time.sleep(1.0)
+            finally:
+                pythoncom.CoUninitialize()
+        else:
+            # LibreOffice headless (Linux / Render)
+            ok = _docx_to_pdf_libreoffice(docx_temp, pdf_dest)
+            if not ok:
+                st.error("❌ Conversione PDF fallita. Assicurati che LibreOffice sia installato.")
+                return False
             
         # 3. ELIMINAZIONE CERTIFICATA DEL WORD
         if docx_temp.exists():
             try:
                 os.remove(docx_temp)
             except:
-                # Tentativo finale ritardato se bloccato
                 time.sleep(2.0)
                 if docx_temp.exists(): 
                     try: os.remove(docx_temp)
@@ -188,6 +201,7 @@ def genera_nuovo_profilo(nome, cognome, tipo_cartella):
     except Exception as e:
         st.error(f"Errore tecnico: {e}")
         return False
+
 
 def importa_profilo_esistente(nome, cognome, tipo_cartella, uploaded_files):
     """Crea la cartella e salva i file caricati senza generare il template."""

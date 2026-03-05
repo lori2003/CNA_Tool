@@ -120,8 +120,12 @@ class _Ctx:
     def tabs(self, labels):        return [_Ctx() for _ in labels]
     # No-op display
     def metric(self, *a, **kw):     pass
-    def dataframe(self, *a, **kw):  pass
-    def table(self, *a, **kw):      pass
+    def dataframe(self, df=None, *a, **kw):
+        if df is not None:
+            _messages().append(_df_to_event(df))
+    def table(self, df=None, *a, **kw):
+        if df is not None:
+            _messages().append(_df_to_event(df))
     def image(self, *a, **kw):      pass
     def code(self, *a, **kw):       pass
     def json(self, *a, **kw):       pass
@@ -163,8 +167,52 @@ def markdown(text='', *a, **kw):
         _messages().append({"type": "markdown", "text": str(text)})
 
 def metric(*a, **kw):    pass
-def dataframe(*a, **kw): pass
-def table(*a, **kw):     pass
+
+def _safe_cell(c):
+    """Converte un valore di cella in tipo JSON-serializzabile nativo."""
+    if c is None:
+        return None
+    if isinstance(c, bool):
+        return c
+    # numpy/pandas scalar: usa .item() per convertire in tipo Python nativo
+    if hasattr(c, 'item'):
+        try:
+            return c.item()
+        except Exception:
+            pass
+    if isinstance(c, (int, float)):
+        # NaN/Inf non sono JSON-serializzabili
+        try:
+            import math
+            if math.isnan(c) or math.isinf(c):
+                return str(c)
+        except Exception:
+            pass
+        return c
+    return str(c)
+
+
+def _df_to_event(df, title=''):
+    """Converte un DataFrame (o dict/list) in un evento serializzabile."""
+    try:
+        if hasattr(df, 'columns') and hasattr(df, 'head'):
+            cols = [str(c) for c in df.columns]
+            raw_rows = df.head(200).values.tolist()
+            rows = [[_safe_cell(c) for c in r] for r in raw_rows]
+            return {"type": "dataframe", "text": title, "data": {"columns": cols, "rows": rows}}
+    except Exception:
+        pass
+    return {"type": "log", "text": str(df)[:500]}
+
+def dataframe(df=None, *a, **kw):
+    if df is None:
+        return
+    _messages().append(_df_to_event(df))
+
+def table(df=None, *a, **kw):
+    if df is None:
+        return
+    _messages().append(_df_to_event(df))
 def text(*a, **kw):      pass
 def caption(*a, **kw):   pass
 def subheader(*a, **kw): pass
@@ -213,7 +261,25 @@ sidebar = _Ctx()
 # ═══════════════════════════════════════════════════════════════
 #  PROGRESS
 # ═══════════════════════════════════════════════════════════════
-def progress(*a, **kw): return _Ctx()
+class _ProgressCtx(_Ctx):
+    """Context manager per progress bar — cattura aggiornamenti."""
+    def __init__(self, value=0, text=''):
+        self._val = value
+        self._emit(value, text)
+
+    def _emit(self, value, text=''):
+        # Normalizza a 0-1
+        v = float(value) if value is not None else 0
+        if v > 1:
+            v = v / 100.0
+        _messages().append({"type": "progress", "value": v, "text": str(text) if text else ""})
+
+    def progress(self, value, text='', **kw):
+        self._emit(value, text)
+        return self
+
+def progress(value=0, text='', *a, **kw):
+    return _ProgressCtx(value, text)
 
 
 # ═══════════════════════════════════════════════════════════════

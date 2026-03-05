@@ -936,6 +936,83 @@ select.fi { cursor: pointer; }
 }
 
 /* ─────────────────────────────────────────────────────────────
+   RUN EVENTS — log eventi catturati dallo shim durante l'esecuzione
+───────────────────────────────────────────────────────────────── */
+.run-events {
+  margin-bottom: 12px;
+  display: flex; flex-direction: column; gap: 5px;
+}
+.run-ev {
+  padding: 8px 12px;
+  border-radius: var(--r8);
+  border-left: 3px solid transparent;
+  font-size: 12.5px; line-height: 1.55;
+}
+.run-ev p { margin: 0 0 3px; }
+.run-ev p:last-child { margin-bottom: 0; }
+.run-ev strong { font-weight: 700; }
+.run-ev code { background: rgba(0,0,0,.07); padding: 1px 4px; border-radius: 3px; font-size: 11px; }
+
+.run-ev-info    { background: #EFF6FF; border-color: var(--blue);  color: #1e40af; }
+.run-ev-success { background: #F0FDF4; border-color: var(--green); color: #14532d; }
+.run-ev-warning { background: #FFFBEB; border-color: var(--amber); color: #92400e; }
+.run-ev-error   { background: #FFF5F5; border-color: var(--red);   color: #991b1b; }
+.run-ev-log     { background: var(--hover-bg); border-color: var(--border); color: var(--t-body); }
+
+/* Progress */
+.run-ev-progress {
+  background: var(--hover-bg);
+  border-left: 3px solid var(--green);
+  padding: 8px 12px;
+  border-radius: var(--r8);
+}
+.run-ev-prog-label {
+  display: block; font-size: 11.5px; color: var(--t-mute); margin-bottom: 5px;
+}
+.run-ev-prog-track {
+  height: 4px; background: var(--border); border-radius: 3px; overflow: hidden;
+}
+.run-ev-prog-fill {
+  height: 100%; background: var(--green);
+  border-radius: 3px; transition: width .3s ease;
+}
+
+/* Dataframe */
+.run-ev-table {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--r8);
+  padding: 10px;
+}
+.run-ev-table-title {
+  font-size: 12px; font-weight: 600; color: var(--t-mute);
+  margin-bottom: 8px;
+}
+.run-ev-table-title p { margin: 0; }
+.run-ev-table-scroll {
+  overflow-x: auto; border-radius: 6px;
+  border: 1px solid var(--border);
+  max-height: 300px; overflow-y: auto;
+}
+.run-ev-tbl {
+  width: 100%; border-collapse: collapse;
+  font-size: 12px; font-family: var(--mono);
+}
+.run-ev-tbl th {
+  background: var(--hover-bg); padding: 6px 10px;
+  text-align: left; font-weight: 600; font-size: 11.5px;
+  color: var(--t-mute); white-space: nowrap;
+  position: sticky; top: 0; z-index: 1;
+  border-bottom: 1px solid var(--border);
+}
+.run-ev-tbl td {
+  padding: 5px 10px; border-bottom: 1px solid var(--border);
+  white-space: nowrap; color: var(--t-body);
+}
+.run-ev-tbl tbody tr:last-child td { border-bottom: none; }
+.run-ev-tbl tbody tr:hover td { background: var(--hover-bg); }
+
+/* ─────────────────────────────────────────────────────────────
    TOAST
 ───────────────────────────────────────────────────────────── */
 #toasts {

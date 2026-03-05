@@ -3,26 +3,27 @@ api/tools_routes.py — Endpoints REST per i tool
 =================================================
 GET  /api/tools                      → lista tool (JSON)
 GET  /api/tools/{uid}/dyninfo?key=   → esegue funzione dynamic_info
-POST /api/tools/{uid}/run            → esegue tool, restituisce zip
+POST /api/tools/{uid}/run            → esegue tool, ritorna JSON con eventi + token download
 POST /api/tools/reload               → ricarica tool dal disco
 GET  /api/tools/{uid}                → singolo tool (JSON)
+GET  /api/download/{token}           → scarica il file ZIP prodotto da /run
 GET  /api/config                     → legge config tema + AI
 POST /api/config                     → salva config
 """
 from __future__ import annotations
 
+import secrets
 import sys
+import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 import urllib.parse
 
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import Response
+from fastapi.responses import JSONResponse, Response
 import io
 
 # Aggiungi la root del progetto a sys.path PRIMA di qualsiasi import locale.
-# Questo garantisce che "import streamlit" trovi streamlit.py (lo shim)
-# nella root invece del pacchetto vero (non installato).
 _ROOT = Path(__file__).resolve().parent.parent
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
@@ -40,12 +41,27 @@ router = APIRouter()
 _TOOLS_CACHE: List[Dict[str, Any]] = []
 _BASE_DIR: Path = _ROOT
 
+# ── Store download in memoria ──────────────────────────────────
+# token -> {data: bytes, filename: str, ts: float}
+_DOWNLOADS: Dict[str, Dict[str, Any]] = {}
+_DOWNLOAD_TTL = 3600  # 1 ora
+
+
+def _store_download(data: bytes, filename: str) -> str:
+    """Salva un file ZIP in memoria e restituisce un token di download."""
+    token = secrets.token_urlsafe(20)
+    _DOWNLOADS[token] = {"data": data, "filename": filename, "ts": time.time()}
+    # Cleanup: rimuovi entry scadute
+    cutoff = time.time() - _DOWNLOAD_TTL
+    stale = [k for k, v in _DOWNLOADS.items() if v["ts"] < cutoff]
+    for k in stale:
+        del _DOWNLOADS[k]
+    return token
+
 
 def init_tools(base_dir: Path) -> None:
     global _TOOLS_CACHE, _BASE_DIR
     _BASE_DIR = base_dir
-    # streamlit.py è nella root; sys.path.insert(0, root) già fatto sopra.
-    # discover_tools importa i tool → "import streamlit as st" trova lo shim.
     _TOOLS_CACHE = discover_tools(base_dir / "tools")
 
 
@@ -75,7 +91,7 @@ def reload_tools():
 def get_dynamic_info(uid: str, key: str):
     """
     Chiama la funzione dynamic_info di un param e restituisce
-    i messaggi catturati dallo shim streamlit (info/warning/error/success).
+    i messaggi catturati dallo shim streamlit.
     """
     t = get_tool_by_uid(uid)
     if not t:
@@ -97,7 +113,6 @@ def get_dynamic_info(uid: str, key: str):
     if not callable(func):
         return {"messages": [], "text": ""}
 
-    # Usa il capture thread-local dello shim streamlit
     import streamlit as _st
     _st._clear_messages()
 
@@ -109,7 +124,6 @@ def get_dynamic_info(uid: str, key: str):
     captured = list(_st._messages())
     text = str(result).strip() if result and isinstance(result, str) else ""
 
-    # Se la funzione restituisce un testo significativo, aggiungilo ai messaggi
     if text and text not in ("None", ""):
         msg_type = "error" if text.startswith("❌") else "info"
         captured.insert(0, {"type": msg_type, "text": text})
@@ -173,15 +187,35 @@ async def run_tool_endpoint(uid: str, request: Request):
             if not isinstance(inputs[k], list):
                 inputs[k] = [inputs[k]]
 
-    success, message, zip_bytes = run_tool(t, inputs, params)
+    success, message, zip_bytes, events = run_tool(t, inputs, params)
 
     if not success:
-        raise HTTPException(400, message)
+        return JSONResponse({
+            "status": "error",
+            "message": message,
+            "events": events,
+        })
 
+    token = _store_download(zip_bytes, f"output_{t['id']}.zip")
+    return JSONResponse({
+        "status": "ok",
+        "message": message,
+        "events": events,
+        "token": token,
+        "filename": f"output_{t['id']}.zip",
+    })
+
+
+@router.get("/download/{token}")
+def download_file(token: str):
+    """Restituisce il file ZIP associato al token di download."""
+    entry = _DOWNLOADS.get(token)
+    if not entry:
+        raise HTTPException(404, "Download non trovato o scaduto (max 1 ora).")
     return Response(
-        content=zip_bytes,
+        content=entry["data"],
         media_type="application/zip",
-        headers={"Content-Disposition": f"attachment; filename=output_{t['id']}.zip"},
+        headers={"Content-Disposition": f'attachment; filename="{entry["filename"]}"'},
     )
 
 

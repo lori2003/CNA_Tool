@@ -760,23 +760,47 @@ async function runTool(uid) {
     const resp = await fetch(`/api/tools/${encodeURIComponent(uid)}/run`, {
       method: 'POST', body: fd,
     });
-    if (!resp.ok) {
-      let msg = resp.statusText;
-      try { msg = (await resp.json()).detail || msg; } catch(_) {}
-      throw new Error(msg);
+
+    // Il server ritorna sempre JSON (200 ok o errore tool)
+    // Per errori pre-run (404, 400) può ritornare HTTPException con .detail
+    let data;
+    try { data = await resp.json(); }
+    catch(_) { throw new Error(resp.statusText || 'Errore di rete'); }
+
+    if (!resp.ok && !data.status) {
+      throw new Error(data.detail || resp.statusText);
     }
 
-    const blob = await resp.blob();
-    const url  = URL.createObjectURL(blob);
-    const name = tool ? tool.id : 'output';
+    const events = data.events || [];
+    const isOk   = data.status === 'ok';
 
-    res.innerHTML = `
-      <div class="res-ok">
-        <div class="res-title">✅ Completato!</div>
-        <div class="res-msg">I file sono pronti per il download.</div>
-        <a href="${url}" download="output_${h(name)}.zip" class="dl-btn">⬇ Scarica ZIP</a>
-      </div>`;
-    toast('Elaborazione completata!', 'ok');
+    let html = '';
+
+    // ── Log eventi ──
+    if (events.length > 0) {
+      html += renderRunEvents(events);
+    }
+
+    // ── Risultato ──
+    if (isOk) {
+      const dlUrl = `/api/download/${h(data.token)}`;
+      html += `
+        <div class="res-ok">
+          <div class="res-title">✅ Completato!</div>
+          <div class="res-msg">${h(data.message || 'Elaborazione completata.')}</div>
+          <a href="${dlUrl}" download="${h(data.filename || 'output.zip')}" class="dl-btn">⬇ Scarica ZIP</a>
+        </div>`;
+      toast('Elaborazione completata!', 'ok');
+    } else {
+      html += `
+        <div class="res-err">
+          <div class="res-title">❌ Errore</div>
+          <div class="res-msg">${h(data.message || 'Errore sconosciuto')}</div>
+        </div>`;
+      toast('Errore: ' + (data.message || 'Errore'), 'err');
+    }
+
+    res.innerHTML = html;
 
   } catch(e) {
     res.innerHTML = `
@@ -790,6 +814,48 @@ async function runTool(uid) {
     btn.classList.remove('loading');
     btn.querySelector('.run-label').textContent = '▶  Esegui Tool';
   }
+}
+
+// ─── Renderer eventi ──────────────────────────────────────────
+function renderRunEvents(events) {
+  if (!events || events.length === 0) return '';
+
+  const items = events.map(ev => {
+    if (ev.type === 'dataframe' && ev.data) {
+      return renderDataframeEvent(ev);
+    }
+    if (ev.type === 'progress') {
+      const pct = Math.min(100, Math.round((ev.value || 0) * 100));
+      const txt = ev.text ? `<span class="run-ev-prog-label">${h(ev.text)}</span>` : '';
+      return `<div class="run-ev run-ev-progress">
+        ${txt}
+        <div class="run-ev-prog-track"><div class="run-ev-prog-fill" style="width:${pct}%"></div></div>
+      </div>`;
+    }
+    const tp = ['info','warning','error','success'].includes(ev.type) ? ev.type : 'log';
+    return `<div class="run-ev run-ev-${tp}">${md(ev.text || '')}</div>`;
+  }).join('');
+
+  return `<div class="run-events">${items}</div>`;
+}
+
+function renderDataframeEvent(ev) {
+  const d = ev.data;
+  if (!d || !d.columns) return '';
+  const title = ev.text ? `<div class="run-ev-table-title">${md(ev.text)}</div>` : '';
+  const thead = `<tr>${d.columns.map(c => `<th>${h(String(c))}</th>`).join('')}</tr>`;
+  const tbody = (d.rows || []).map(row =>
+    `<tr>${row.map(cell => `<td>${h(cell == null ? '' : String(cell))}</td>`).join('')}</tr>`
+  ).join('');
+  return `<div class="run-ev run-ev-table">
+    ${title}
+    <div class="run-ev-table-scroll">
+      <table class="run-ev-tbl">
+        <thead>${thead}</thead>
+        <tbody>${tbody}</tbody>
+      </table>
+    </div>
+  </div>`;
 }
 
 // ═══════════════════════════════════════════════════════════════

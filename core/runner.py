@@ -1,11 +1,12 @@
 """
 core/runner.py — Tool execution engine
 =======================================
-Esegue run() di un tool in un directory temporanea e restituisce
-i file prodotti come bytes per il download.
+Esegue run() di un tool in una directory temporanea, raccoglie gli eventi
+catturati dallo shim streamlit (error/success/info/warning/log/dataframe/progress)
+e restituisce un payload strutturato.
 
-Nota: i tool fanno "import streamlit as st" — viene intercettato
-dallo shim streamlit.py nella root del progetto (zero dipendenza reale).
+Firma pubblica:
+    run_tool(tool, inputs, params) -> (success, message, zip_bytes | None, events)
 """
 from __future__ import annotations
 
@@ -20,17 +21,18 @@ def run_tool(
     tool: Dict[str, Any],
     inputs: Dict[str, Any],
     params: Dict[str, Any],
-) -> Tuple[bool, str, Optional[bytes]]:
+) -> Tuple[bool, str, Optional[bytes], List[Dict[str, Any]]]:
     """
-    Esegue il tool e restituisce (success, message, zip_bytes).
+    Esegue il tool e restituisce (success, message, zip_bytes, events).
 
     - success: True se tutto ok
-    - message: messaggio errore o successo
+    - message: messaggio principale
     - zip_bytes: bytes dello zip con i file output (None se errore)
+    - events: lista eventi UI catturati (error/success/info/warning/log/dataframe/progress)
     """
     runner = tool.get("runner")
     if runner is None:
-        return False, "Tool non ha una funzione run().", None
+        return False, "Tool non ha una funzione run().", None, []
 
     # Reset stato streamlit (session_state + messaggi) per ogni run
     try:
@@ -72,13 +74,19 @@ def run_tool(
         try:
             result = runner(**run_kwargs)
         except TypeError:
-            # Prova senza keyword per compatibilità
             try:
                 result = runner(**{k: v for k, v in run_kwargs.items()})
             except Exception as e2:
-                return False, f"Errore esecuzione tool: {e2}", None
+                events = _collect_events()
+                events.append({"type": "error", "text": str(e2)})
+                return False, f"Errore esecuzione tool: {e2}", None, events
         except Exception as e:
-            return False, f"Errore esecuzione tool: {e}", None
+            events = _collect_events()
+            events.append({"type": "error", "text": str(e)})
+            return False, f"Errore esecuzione tool: {e}", None, events
+
+        # Raccoglie eventi catturati dallo shim
+        events = _collect_events()
 
         # Raccoglie i file output — accetta sia Path che str
         output_files: List[Path] = []
@@ -90,11 +98,10 @@ def run_tool(
                     output_files.append(item)
 
         if not output_files:
-            # Fallback: prende tutto quello che c'è in out_dir
             output_files = [p for p in out_dir.rglob("*") if p.is_file()]
 
         if not output_files:
-            return False, "Il tool non ha prodotto file di output.", None
+            return False, "Il tool non ha prodotto file di output.", None, events
 
         # Crea zip in memoria
         zip_buf = io.BytesIO()
@@ -103,8 +110,18 @@ def run_tool(
                 try:
                     arcname = p.relative_to(out_dir)
                 except ValueError:
-                    arcname = p.name   # file salvato fuori da out_dir
+                    arcname = p.name
                 zf.write(p, arcname)
 
         zip_buf.seek(0)
-        return True, f"Completato. {len(output_files)} file prodotti.", zip_buf.read()
+        message = f"Completato. {len(output_files)} file prodotti."
+        return True, message, zip_buf.read(), events
+
+
+def _collect_events() -> List[Dict[str, Any]]:
+    """Raccoglie e restituisce gli eventi catturati dallo shim streamlit."""
+    try:
+        import streamlit as _st
+        return list(_st._messages())
+    except Exception:
+        return []

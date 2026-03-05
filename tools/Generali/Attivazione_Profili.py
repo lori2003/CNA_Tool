@@ -1,14 +1,25 @@
 import os
 import shutil
-import pythoncom
-import comtypes.client
 import json
 import time
 from datetime import datetime
 from pathlib import Path
 import streamlit as st
-from docx import Document
 import re
+
+try:
+    from docx import Document
+    _DOCX_AVAILABLE = True
+except ImportError:
+    _DOCX_AVAILABLE = False
+
+try:
+    import pythoncom
+    import comtypes.client
+    _COM_AVAILABLE = True
+except ImportError:
+    _COM_AVAILABLE = False
+
 
 # -----------------------------------------------------------------------------
 # CONFIGURAZIONE PATH E COSTANTI
@@ -98,6 +109,13 @@ TOOL = {
 # -----------------------------------------------------------------------------
 def genera_nuovo_profilo(nome, cognome, tipo_cartella):
     """Crea cartella, genera PDF e garantisce l'eliminazione del Word."""
+    if not _COM_AVAILABLE or not _DOCX_AVAILABLE:
+        st.error(
+            "❌ Questo tool richiede **Microsoft Word** e le librerie COM di Windows. "
+            "Non è compatibile con Linux/Cloud — usalo solo sul tuo PC locale."
+        )
+        return False
+
     if not TEMPLATE_PATH.exists():
         st.error(f"Template non trovato in: {TEMPLATE_PATH}")
         return False
@@ -153,6 +171,7 @@ def genera_nuovo_profilo(nome, cognome, tipo_cartella):
             time.sleep(1.0) # Attesa per rilascio file system
         finally:
             pythoncom.CoUninitialize()
+
             
         # 3. ELIMINAZIONE CERTIFICATA DEL WORD
         if docx_temp.exists():
